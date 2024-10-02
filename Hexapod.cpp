@@ -3,6 +3,7 @@
 
 #include "Hexapod.h"
 
+// old!!! Use movyBody
 bool Hexapod::bodyMovement(int16_t xTrans, int16_t yTrans, int16_t zTrans, float roll, float pitch, float yaw) {
   /*
    * moves and rotates the body of the hexapod by the specified amount, while all legs stay stationary on the ground.
@@ -19,12 +20,12 @@ bool Hexapod::bodyMovement(int16_t xTrans, int16_t yTrans, int16_t zTrans, float
   // code...
   // initialize an array with all local coordinates for all legs
   // +++++++++++++++++++++++++++++++++++++++++++++++ TODO: change to current leg position!!! +++++++++++++++++++++++++++++++++++++++++++++++
-  float newPositions[6][3] = { { homePos[0], homePos[1], homePos[2] },    // front right
-                               { homePos[0], homePos[1], homePos[2] },    // front left
-                               { homePos[0], homePos[1], homePos[2] },    // mid right
-                               { homePos[0], homePos[1], homePos[2] },    // mid left
-                               { homePos[0], homePos[1], homePos[2] },    // rear right
-                               { homePos[0], homePos[1], homePos[2] } };  // rear left
+  float newPositions[6][3] = { { (float)homePos[0], (float)homePos[1], (float)homePos[2] },    // front right
+                               { (float)homePos[0], (float)homePos[1], (float)homePos[2] },    // front left
+                               { (float)homePos[0], (float)homePos[1], (float)homePos[2] },    // mid right
+                               { (float)homePos[0], (float)homePos[1], (float)homePos[2] },    // mid left
+                               { (float)homePos[0], (float)homePos[1], (float)homePos[2] },    // rear right
+                               { (float)homePos[0], (float)homePos[1], (float)homePos[2] } };  // rear left
 
   // ----------------------------------------------------------------------------
   // calculate the new position due to the translational portion of the movement
@@ -187,7 +188,6 @@ bool Hexapod::bodyMovement(int16_t xTrans, int16_t yTrans, int16_t zTrans, float
 
 
   // move all legs to the new position and return true if every servo could reach the target
-  bool flag = true;
   if (legFR.moveTo(newPositions[0][0], newPositions[0][1], newPositions[0][2]) && legFL.moveTo(newPositions[1][0], newPositions[1][1], newPositions[1][2])
       && legMR.moveTo(newPositions[2][0], newPositions[2][1], newPositions[2][2]) && legML.moveTo(newPositions[3][0], newPositions[3][1], newPositions[3][2])
       && legRR.moveTo(newPositions[4][0], newPositions[4][1], newPositions[4][2]) && legRL.moveTo(newPositions[5][0], newPositions[5][1], newPositions[5][2])) {
@@ -202,7 +202,6 @@ bool Hexapod::moveHome() {
    * moves all legs instantly to the home position.
    * returns true if successful
    */
-  bool flag = true;
   if (legFR.moveTo(homePos[0], homePos[1], homePos[2]) && legFL.moveTo(homePos[0], homePos[1], homePos[2])
       && legMR.moveTo(homePos[0], homePos[1], homePos[2]) && legML.moveTo(homePos[0], homePos[1], homePos[2])
       && legRR.moveTo(homePos[0], homePos[1], homePos[2]) && legRL.moveTo(homePos[0], homePos[1], homePos[2])) {
@@ -233,12 +232,12 @@ bool Hexapod::moveBody(int16_t xTrans, int16_t yTrans, int16_t zTrans, float rol
   // code...
   // initialize an array with all local coordinates for all legs
   // +++++++++++++++++++++++++++++++++++++++++++++++ TODO: change to current leg position!!! +++++++++++++++++++++++++++++++++++++++++++++++
-  float newPositions[6][3] = { { homePos[0], homePos[1], homePos[2] },    // front right
-                               { homePos[0], homePos[1], homePos[2] },    // front left
-                               { homePos[0], homePos[1], homePos[2] },    // mid right
-                               { homePos[0], homePos[1], homePos[2] },    // mid left
-                               { homePos[0], homePos[1], homePos[2] },    // rear right
-                               { homePos[0], homePos[1], homePos[2] } };  // rear left
+  float newPositions[6][3] = { { (float)homePos[0], (float)homePos[1], (float)homePos[2] },    // front right
+                               { (float)homePos[0], (float)homePos[1], (float)homePos[2] },    // front left
+                               { (float)homePos[0], (float)homePos[1], (float)homePos[2] },    // mid right
+                               { (float)homePos[0], (float)homePos[1], (float)homePos[2] },    // mid left
+                               { (float)homePos[0], (float)homePos[1], (float)homePos[2] },    // rear right
+                               { (float)homePos[0], (float)homePos[1], (float)homePos[2] } };  // rear left
 
   // complete rotational matrix for roll pitch yaw angles. See https://de.wikipedia.org/wiki/Roll-Nick-Gier-Winkel
   const float rotMatrix[3][3] = { { cos(pitch) * cos(yaw), sin(roll) * sin(pitch) * cos(yaw) - cos(roll) * sin(yaw), cos(roll) * sin(pitch) * cos(yaw) + sin(roll) * sin(yaw) },
@@ -472,10 +471,24 @@ bool Hexapod::moveBody(int16_t xTrans, int16_t yTrans, int16_t zTrans, float rol
   newPositions[5][1] = temp * sin(PI + cornerLegAngle) + newPositions[5][1] * cos(PI + cornerLegAngle);
 
   // move all legs to the new position and return true if every servo could reach the target
-  bool flag = true;
   if (legFR.moveTo(newPositions[0][0], newPositions[0][1], newPositions[0][2]) && legFL.moveTo(newPositions[1][0], newPositions[1][1], newPositions[1][2])
       && legMR.moveTo(newPositions[2][0], newPositions[2][1], newPositions[2][2]) && legML.moveTo(newPositions[3][0], newPositions[3][1], newPositions[3][2])
       && legRR.moveTo(newPositions[4][0], newPositions[4][1], newPositions[4][2]) && legRL.moveTo(newPositions[5][0], newPositions[5][1], newPositions[5][2])) {
+    return true;
+  } else {
+    return false;
+  }
+  //return moveLegs(newPositions, 6, 3);
+}
+
+bool Hexapod::moveLegs(int positions[][3], int legCount){
+  if(legCount != 6){
+    return false;
+  }
+  // move all legs to the new position and return true if every servo could reach the target
+  if (legFR.moveTo(positions[0][0], positions[0][1], positions[0][2]) && legFL.moveTo(positions[1][0], positions[1][1], positions[1][2])
+      && legMR.moveTo(positions[2][0], positions[2][1], positions[2][2]) && legML.moveTo(positions[3][0], positions[3][1], positions[3][2])
+      && legRR.moveTo(positions[4][0], positions[4][1], positions[4][2]) && legRL.moveTo(positions[5][0], positions[5][1], positions[5][2])) {
     return true;
   } else {
     return false;
