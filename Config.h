@@ -86,4 +86,7 @@ const uint8_t buttonRL = 11;
 const uint8_t homePos[3] = {0, 73, 80};
 //const uint8_t homePos[3] = {0, 68, 88};
 
+// the loop is executed every [periodMs] milliseconds
+int periodMs = 20;
+
 #endif /* Config_H */

@@ -14,13 +14,14 @@ public:
   // Old!!! use moveBody
   bool bodyMovement(int16_t xTrans, int16_t yTrans, int16_t zTrans,  float roll, float pitch, float yaw);
 
-  bool moveBody(int16_t xTrans, int16_t yTrans, int16_t zTrans, float roll, float pitch, float yaw);
+  //calculates the next position for each leg and passes them to newPositions[][] array
+  void moveBodyCalc(int newPositions[6][3], int16_t xTrans, int16_t yTrans, int16_t zTrans, float roll, float pitch, float yaw);
 
   // method to instantly move all legs to the default (home) position. Returns true if successful
   bool moveHome();
 
-  // method to instantly move the legs to their positions as specified in 
-  bool moveLegs(int positions[][3], int legCount);
+  // method to instantly move the legs to their positions as specified in the array
+  bool moveLegs(int positions[6][3]);
 
 private:
   Leg &legFR;

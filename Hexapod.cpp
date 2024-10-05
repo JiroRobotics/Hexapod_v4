@@ -213,17 +213,18 @@ bool Hexapod::moveHome() {
 
 
 
-bool Hexapod::moveBody(int16_t xTrans, int16_t yTrans, int16_t zTrans, float roll, float pitch, float yaw) {
+void Hexapod::moveBodyCalc(int newPositions[6][3], int16_t xTrans, int16_t yTrans, int16_t zTrans, float roll, float pitch, float yaw) {
   /*
-   * moves and rotates the body of the hexapod by the specified amount, while all legs stay stationary on the ground.
-   * xTrans:      distance (in mm) to move the center of the robot in x direction (global coordinates) (back/forth)
-   * yTrans:      distance (in mm) to move the center of the robot in y direction (global coordinates) (sideways)
-   * zTrans:      distance (in mm) to move the center of the robot in z direction (global coordinates) (up/down)
-   * roll:        angle (in rad) to rotate around the x-axis
-   * pitch:       angle (in rad) to rotate around the y-axis
-   * yaw:         angle (in rad) to rotate around the z-axis
+   * calculates the next position for each leg in local x-y-z coordinates to achieve the specified translation and rotation
+   * newPositions:  6x3 array to store the calculated coordinates in
+   * xTrans:        distance (in mm) to move the center of the robot in x direction (global coordinates) (back/forth)
+   * yTrans:        distance (in mm) to move the center of the robot in y direction (global coordinates) (sideways)
+   * zTrans:        distance (in mm) to move the center of the robot in z direction (global coordinates) (up/down)
+   * roll:          angle (in rad) to rotate around the x-axis
+   * pitch:         angle (in rad) to rotate around the y-axis
+   * yaw:           angle (in rad) to rotate around the z-axis
    *
-   * returns:     true if all servos could reach their position, false otherwise
+   * returns:     nothing
    *
    * runtime on Arduino Nano 33 IoT: <5.65ms (default), <8.2ms (useFloat)
    * runtime on Arduino Nano 33 BLE Sense: <3.85ms (default), <3.95ms (useFloat) (<- this is what a FPU is made for)
@@ -232,12 +233,12 @@ bool Hexapod::moveBody(int16_t xTrans, int16_t yTrans, int16_t zTrans, float rol
   // code...
   // initialize an array with all local coordinates for all legs
   // +++++++++++++++++++++++++++++++++++++++++++++++ TODO: change to current leg position!!! +++++++++++++++++++++++++++++++++++++++++++++++
-  float newPositions[6][3] = { { (float)homePos[0], (float)homePos[1], (float)homePos[2] },    // front right
+  /*float newPositions[6][3] = { { (float)homePos[0], (float)homePos[1], (float)homePos[2] },    // front right
                                { (float)homePos[0], (float)homePos[1], (float)homePos[2] },    // front left
                                { (float)homePos[0], (float)homePos[1], (float)homePos[2] },    // mid right
                                { (float)homePos[0], (float)homePos[1], (float)homePos[2] },    // mid left
                                { (float)homePos[0], (float)homePos[1], (float)homePos[2] },    // rear right
-                               { (float)homePos[0], (float)homePos[1], (float)homePos[2] } };  // rear left
+                               { (float)homePos[0], (float)homePos[1], (float)homePos[2] } };  // rear left*/
 
   // complete rotational matrix for roll pitch yaw angles. See https://de.wikipedia.org/wiki/Roll-Nick-Gier-Winkel
   const float rotMatrix[3][3] = { { cos(pitch) * cos(yaw), sin(roll) * sin(pitch) * cos(yaw) - cos(roll) * sin(yaw), cos(roll) * sin(pitch) * cos(yaw) + sin(roll) * sin(yaw) },
@@ -469,22 +470,9 @@ bool Hexapod::moveBody(int16_t xTrans, int16_t yTrans, int16_t zTrans, float rol
   temp = newPositions[5][0];
   newPositions[5][0] = newPositions[5][0] * cos(PI + cornerLegAngle) - newPositions[5][1] * sin(PI + cornerLegAngle);
   newPositions[5][1] = temp * sin(PI + cornerLegAngle) + newPositions[5][1] * cos(PI + cornerLegAngle);
-
-  // move all legs to the new position and return true if every servo could reach the target
-  if (legFR.moveTo(newPositions[0][0], newPositions[0][1], newPositions[0][2]) && legFL.moveTo(newPositions[1][0], newPositions[1][1], newPositions[1][2])
-      && legMR.moveTo(newPositions[2][0], newPositions[2][1], newPositions[2][2]) && legML.moveTo(newPositions[3][0], newPositions[3][1], newPositions[3][2])
-      && legRR.moveTo(newPositions[4][0], newPositions[4][1], newPositions[4][2]) && legRL.moveTo(newPositions[5][0], newPositions[5][1], newPositions[5][2])) {
-    return true;
-  } else {
-    return false;
-  }
-  //return moveLegs(newPositions, 6, 3);
 }
 
-bool Hexapod::moveLegs(int positions[][3], int legCount){
-  if(legCount != 6){
-    return false;
-  }
+bool Hexapod::moveLegs(int positions[6][3]){
   // move all legs to the new position and return true if every servo could reach the target
   if (legFR.moveTo(positions[0][0], positions[0][1], positions[0][2]) && legFL.moveTo(positions[1][0], positions[1][1], positions[1][2])
       && legMR.moveTo(positions[2][0], positions[2][1], positions[2][2]) && legML.moveTo(positions[3][0], positions[3][1], positions[3][2])
