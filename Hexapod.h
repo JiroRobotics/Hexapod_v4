@@ -14,8 +14,11 @@ public:
   // Old!!! use moveBody
   bool bodyMovement(int16_t xTrans, int16_t yTrans, int16_t zTrans,  float roll, float pitch, float yaw);
 
-  //calculates the next position for each leg and passes them to newPositions[][] array
+  // calculates the next position for each leg and passes them to newPositions[][] array
   void moveBodyCalc(int newPositions[6][3], int16_t xTrans, int16_t yTrans, int16_t zTrans, float roll, float pitch, float yaw);
+
+  // calculates the next position for crab movement for all legs and passes them to newPositions[][]
+  void crabCalc(int newPositions[6][3], uint16_t stepDist, float stepDirection);
 
   // method to instantly move all legs to the default (home) position. Returns true if successful
   bool moveHome();
@@ -33,6 +36,13 @@ private:
 
   // z-coordinate of the robots center of mass (equivalent to the height of the coxa joints if rotation is zero)
   uint8_t zHeight = 80;
+  // total orientation of the robots local coordinate system relative to the global coordinate system
+  float totalRoll = 0.0;
+  float totalPitch = 0.0;
+  float totalYaw = 0.0;
+  int16_t totalxTrans = 0;
+  int16_t totalyTrans = 0;
+  int16_t totalzTrans = 0;
 };
 
 #endif /* Hexapod_H */

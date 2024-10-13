@@ -27,30 +27,43 @@ unsigned long loopCounter = 0;
 
 // array which stores the positions of each leg in x-y-z local coordinates
 // used to pass the calculated new positions to the .movelegs() methode
-int legPositions[6][3] = { { (float)homePos[0], (float)homePos[1], (float)homePos[2] },    // front right
-                           { (float)homePos[0], (float)homePos[1], (float)homePos[2] },    // front left
-                           { (float)homePos[0], (float)homePos[1], (float)homePos[2] },    // mid right
-                           { (float)homePos[0], (float)homePos[1], (float)homePos[2] },    // mid left
-                           { (float)homePos[0], (float)homePos[1], (float)homePos[2] },    // rear right
-                           { (float)homePos[0], (float)homePos[1], (float)homePos[2] } };  // rear left
+int legPositions[6][3] = { { homePos[0], homePos[1], homePos[2] },    // front right
+                           { homePos[0], homePos[1], homePos[2] },    // front left
+                           { homePos[0], homePos[1], homePos[2] },    // mid right
+                           { homePos[0], homePos[1], homePos[2] },    // mid left
+                           { homePos[0], homePos[1], homePos[2] },    // rear right
+                           { homePos[0], homePos[1], homePos[2] } };  // rear left
 
 void setup() {
+  // use the builtin LED on pin 13 as an OUTPUT
   pinMode(LED_BUILTIN, OUTPUT);
+  digitalWrite(LED_BUILTIN, LOW);
+  // use all the push buttons on the legs as INPUT
   pinMode(buttonFR, INPUT);
   pinMode(buttonFL, INPUT);
   pinMode(buttonMR, INPUT);
   pinMode(buttonML, INPUT);
   pinMode(buttonRR, INPUT);
   pinMode(buttonRL, INPUT);
-  digitalWrite(LED_BUILTIN, LOW);
+
+  // used for debug
   Serial.begin(9600);
+
+  // start pwm on the servo drivers with 50Hz frequency
   pwm1.begin();
   pwm1.setPWMFreq(50);
   pwm2.begin();
   pwm2.setPWMFreq(50);
 
+  // move all legs to their home position
   myHexapod.moveHome();
   delay(1000);
+
+  //Configure WDT.
+  NRF_WDT->CONFIG = 0x01;    // Configure WDT to run when CPU is asleep
+  NRF_WDT->CRV = 65535;      // Timeout set to 2 seconds, timeout[s] = (CRV+1)/32768
+  NRF_WDT->RREN = 0x01;      // Enable the RR[0] reload register
+  NRF_WDT->TASKS_START = 1;  // Start WDT
 }
 void loop() {
   // get the current time
@@ -59,11 +72,20 @@ void loop() {
   // calculate the new leg position
   // ...
 
+
   // update the leg position
   myHexapod.moveLegs(legPositions);
-  while(millis() < timeMillis + periodMs){
+  while (millis() < timeMillis + periodMs) {
     // wait a bit so that the loop is executet every 20ms
   }
+  // increment the loopCounter to keep track of the number of loop cycles
+  loopCounter++;
+  if(loopCounter == 1000){
+    loopCounter = 0;
+  }
+  // Reload the WDTs RR[0] reload register
+  // if this line isn't called at least every 2 seconds, the TIMEOUT event is called and the CPU is reset
+  NRF_WDT->RR[0] = WDT_RR_RR_Reload;
 }
 /*
 void loop() {

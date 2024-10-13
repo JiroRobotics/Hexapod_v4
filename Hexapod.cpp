@@ -239,6 +239,14 @@ void Hexapod::moveBodyCalc(int newPositions[6][3], int16_t xTrans, int16_t yTran
                                { (float)homePos[0], (float)homePos[1], (float)homePos[2] },    // mid left
                                { (float)homePos[0], (float)homePos[1], (float)homePos[2] },    // rear right
                                { (float)homePos[0], (float)homePos[1], (float)homePos[2] } };  // rear left*/
+  
+  // correct all parameters since we use the previous leg position as starting point
+  xTrans -= totalxTrans;
+  yTrans -= totalyTrans;
+  zTrans -= totalzTrans;
+  roll -= totalRoll;
+  pitch -= totalPitch;
+  yaw -= totalYaw;
 
   // complete rotational matrix for roll pitch yaw angles. See https://de.wikipedia.org/wiki/Roll-Nick-Gier-Winkel
   const float rotMatrix[3][3] = { { cos(pitch) * cos(yaw), sin(roll) * sin(pitch) * cos(yaw) - cos(roll) * sin(yaw), cos(roll) * sin(pitch) * cos(yaw) + sin(roll) * sin(yaw) },
@@ -470,6 +478,18 @@ void Hexapod::moveBodyCalc(int newPositions[6][3], int16_t xTrans, int16_t yTran
   temp = newPositions[5][0];
   newPositions[5][0] = newPositions[5][0] * cos(PI + cornerLegAngle) - newPositions[5][1] * sin(PI + cornerLegAngle);
   newPositions[5][1] = temp * sin(PI + cornerLegAngle) + newPositions[5][1] * cos(PI + cornerLegAngle);
+
+  // update and save the orientation of the robot
+  totalRoll += roll;
+  totalPitch += pitch;
+  totalYaw += yaw;
+  totalxTrans += xTrans;
+  totalyTrans += yTrans;
+  totalzTrans += zTrans;
+}
+
+void Hexapod::crabCalc(int newPositions[6][3], uint16_t stepDist, float stepDirection){
+
 }
 
 bool Hexapod::moveLegs(int positions[6][3]){
