@@ -17,6 +17,12 @@ public:
   // moves the leg instantly to the desired position. Returns false if a servo couldn't reach target position
   bool moveTo(int xValue, int yValue, int zValue);
 
+  // returns true if the leg is touching the ground
+  [[nodiscard]] bool touchesGround();
+
+  // checks whether the specified point (with L, z value) is reachable by the leg. Returns true if reachable
+  inline bool isReachable(int L, int z);
+
   // getter-functions for the current x-y-z-Values where the point of the leg is at
   [[nodiscard]] int getXVal();
   [[nodiscard]] int getYVal();

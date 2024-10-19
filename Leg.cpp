@@ -1,6 +1,7 @@
 // Leg.cpp
 
 #include "Leg.h"
+// uncomment the following line to use higher precision. Doesn't bring any visual improvement
 //#define useFloat
 
 void Leg::setAngle(uint8_t servoPin, int offset, int angleVal) {
@@ -17,9 +18,12 @@ void Leg::setAngle(uint8_t servoPin, int offset, int angleVal) {
 bool Leg::moveTo(int xValue, int yValue, int zValue) {
   /*
    * moves the leg to the given x y z coordinates (in local coordinate system)
+   *
    * int xValue:    the x-value (left/right) in mm to move the legpoint to
    * int yValue:    the y-value (back/forth) in mm to move the legpoint to
    * int zValue:    the z-value (height) in mm to move the legpoint to
+   *
+   * returns:       true if the leg reached the point, false if the point is unreachable
    */
 
   // flag rises when leg can't reach the desired position
@@ -28,6 +32,11 @@ bool Leg::moveTo(int xValue, int yValue, int zValue) {
   //calculate 2 helper variables L1 and L. Used to calculate the two other angles
   float L1 = sqrt((float)xValue * xValue + yValue * yValue);
   float L = sqrt((float)zValue * zValue + (L1 - coxaLength) * (L1 - coxaLength));
+
+  // abort if the desired point is unreachable. Doesn't check for coxa servo (gamma angle)
+  if(!isReachable(L, zValue)){
+    return false;
+  }
 
 #if defined(useFloat)
   float gamma = atan2(yValue, xValue) * 180 / PI;
@@ -159,4 +168,53 @@ bool Leg::moveTo(int xValue, int yValue, int zValue) {
 
 float Leg::mapFloat(float x, float in_min, float in_max, float out_min, float out_max) {
   return (x - in_min) * (out_max - out_min) / (in_max - in_min) + out_min;
+}
+
+[[nodiscard]] bool Leg::touchesGround() {
+  return digitalRead(pinPushButton);
+}
+
+inline bool Leg::isReachable(int L, int z) {
+  /*
+   * checks whether the point specified by L (horizontal distance from local coordinate frame to end point) 
+   * and z (vertical distance from local coordinate frame to end point) is reachable.
+   * Returns true if the point is reachable, false otherwise. Check documentation for detailed description
+   *
+   * L:       horizontal distance from local coordinate frame to desired end point (sqrt(x*x+y*y))
+   * z:       desired vertical coordinate of leg end point
+   * 
+   * returns: true if the point is reachable
+   */
+
+  // invert the z coordinate since the z axis is pointing down
+  z = -z;
+
+  // divide the range for L into segments. Most of which are described by semicircles
+  if (L < 0 || L > 150) {
+    return false;
+  } else if (L >= 0 && L <= 66.98) {
+    if (z * z >= 64 * 64 - (L - 22) * (L - 22) && z >= -std::sqrt(88 * 88 - (L - 59.68) * (L - 59.68)) - 26.38) {
+      return true;
+    } else {
+      return false;
+    }
+  } else if (L > 66.98 && L <= 87.9) {
+    if (z <= 1.13 * L - 120.88 && z >= -std::sqrt(88 * 88 - (L - 59.68) * (L - 59.68)) - 26.38) {
+      return true;
+    } else {
+      return false;
+    }
+  } else if (L > 87.9 && L <= 107.45) {
+    if (z <= 1.13 * L - 120.88 && z * z <= 128 * 128 - (L - 22) * (L - 22)) {
+      return true;
+    } else {
+      return false;
+    }
+  } else if (L > 107.45 && L <= 150) {
+    if (z <= 0 && z * z <= 128 * 128 - (L - 22) * (L - 22)) {
+      return true;
+    } else {
+      return false;
+    }
+  }
 }
