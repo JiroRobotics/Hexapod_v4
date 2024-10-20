@@ -62,7 +62,8 @@ bool Leg::moveTo(int xValue, int yValue, int zValue) {
   }
 
   // checks the same for femur and tibia servos
-  if (L <= (femurLength + tibiaLength - 5)) {
+  // not necessary as we have isReachable()
+  /*if (L <= (femurLength + tibiaLength - 5)) {
     if (alpha + offsetTibia <= 134) {
       servoDriver.setPWM(pinFemur, 0, angleFloat(alpha + offsetFemur));
     } else {
@@ -71,7 +72,9 @@ bool Leg::moveTo(int xValue, int yValue, int zValue) {
     servoDriver.setPWM(pinTibia, 0, angleFloat(beta + offsetTibia));
   } else {
     flag = false;
-  }
+  }*/
+  servoDriver.setPWM(pinFemur, 0, angleFloat(alpha + offsetFemur));
+  servoDriver.setPWM(pinTibia, 0, angleFloat(beta + offsetTibia));
 #else
   int gamma = SpeedTrig.atan2(yValue, xValue) * 180 / PI;
   gamma = map(gamma, 0, 180, 180, 0);
@@ -95,7 +98,8 @@ bool Leg::moveTo(int xValue, int yValue, int zValue) {
   }
 
   // checks the same for femur and tibia servos
-  if (L <= (femurLength + tibiaLength - 5)) {
+  // not necessary as we have isReachable()
+  /*if (L <= (femurLength + tibiaLength - 5)) {
     if (alpha + offsetTibia <= 134) {
       servoDriver.setPWM(pinFemur, 0, angle(alpha + offsetFemur));
     } else {
@@ -104,7 +108,9 @@ bool Leg::moveTo(int xValue, int yValue, int zValue) {
     servoDriver.setPWM(pinTibia, 0, angle(beta + offsetTibia));
   } else {
     flag = false;
-  }
+  }*/
+  servoDriver.setPWM(pinFemur, 0, angle(alpha + offsetFemur));
+  servoDriver.setPWM(pinTibia, 0, angle(beta + offsetTibia));
 #endif
 
   // save the current position of the leg
@@ -174,7 +180,7 @@ float Leg::mapFloat(float x, float in_min, float in_max, float out_min, float ou
   return digitalRead(pinPushButton);
 }
 
-inline bool Leg::isReachable(int L, int z) {
+inline bool Leg::isReachable(float L, int z) {
   /*
    * checks whether the point specified by L (horizontal distance from local coordinate frame to end point) 
    * and z (vertical distance from local coordinate frame to end point) is reachable.

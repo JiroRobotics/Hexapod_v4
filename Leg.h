@@ -21,7 +21,7 @@ public:
   [[nodiscard]] bool touchesGround();
 
   // checks whether the specified point (with L, z value) is reachable by the leg. Returns true if reachable
-  inline bool isReachable(int L, int z);
+  inline bool isReachable(float L, int z);
 
   // getter-functions for the current x-y-z-Values where the point of the leg is at
   [[nodiscard]] int getXVal();

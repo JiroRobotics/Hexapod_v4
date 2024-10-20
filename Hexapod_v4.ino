@@ -83,7 +83,7 @@ void loop() {
 
   // calculate the new leg position
   // ...
-  if (myHexapod.getAction() == 0) {
+  /*if (myHexapod.getAction() == 0) {
     counter++;
     if (counter == 20) {
       counter = 0;
@@ -103,8 +103,8 @@ void loop() {
 
       myHexapod.calcBodyMovement(legPositions, legPositions, 0, 0, 0, roll, -pitch, 0.0);
     }
-  }
-  myHexapod.calcCrabwalk(legPositions, currPositions, 30, 0, 150, 35, true);
+  }*/
+  myHexapod.calcCrabwalk(legPositions, currPositions, 45, 0, 100);
 
 
   /*if (counter % 5 == 2 || counter % 5 == 3 || counter % 5 == 4 || myHexapod.getAction() == 1) {
