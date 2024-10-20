@@ -24,8 +24,8 @@ The code for this robot was entirely written in C++ (or rather the Arduino versi
 
 (UML diagram to be added)
 
-Lets take a look at the math-heavy challenges for this project
+Let's take a look at the math-heavy challenges for this project
 
 ### Inverse kinematics of one leg
-
-
+**Goal:** given a point (x, y, z) in the local coordinate frame of the leg, calculate the joint angles of the three servo motors so that the end point of the leg reaches the desired point
+First, we assume that the point is valid/reachable (more on that later). Next we will have to take a look at the coordinate system and how the leg is positioned in it.
