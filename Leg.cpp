@@ -34,7 +34,7 @@ bool Leg::moveTo(int xValue, int yValue, int zValue) {
   float L = sqrt((float)zValue * zValue + (L1 - coxaLength) * (L1 - coxaLength));
 
   // abort if the desired point is unreachable. Doesn't check for coxa servo (gamma angle)
-  if(!isReachable(L, zValue)){
+  if(!isReachable(L1, zValue)){
     return false;
   }
 
