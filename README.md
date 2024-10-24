@@ -50,6 +50,73 @@ angle() is a function to convert the angle in degrees to the corresponding pulse
 ### Calculating valid points
 The leg can't reach every (x, y, z) point in 3D space. If we instruct the leg to move to an unreachable point, weird things can happen, potentionally even breaking the robot. Even if all points passed to the leg function _should_ be reachable, it is recommended to implement the following as a last safeguard:
 The constrains for the coxaAngle parameter can be chosen by simply measuring how far the legs can rotate before hitting the neighboring leg rotating in the opposite direction. In this case, coxaAngle can only be in the interval [40°, 130°]
-Instead of implementing constrains for tibiaAngle and femurAngle, we simply look at the L1 value and the z value and define an area in which L1 and z have to be to be valid. This area can be found mathematically or approximated using a CAD model (as shown in the image). By comparing L1 and z to the upper and lower bound, each point can be verified.
+Instead of implementing constrains directly for tibiaAngle and femurAngle, we simply look at the L1 value and the z value and define an area in which L1 and z have to be to be valid. This area can be found mathematically or approximated using a CAD model (as shown in the image). By comparing L1 and z to the upper and lower bound, each point can be verified.
 
 ![Image of the area reachable by one leg](pictures/HexapodLegReach.PNG)
+
+### The Hexapod class
+As mentioned above, the six leg classes are passed to one Hexapod class which coordinates the legs and calculates all necessary points in the (local) coordinate system for each leg. The Hexapod class contains multiple methods for moving the robot:
+* **Leg movement:** This elementary method moves all six legs to their positions as specified in the array, if they are reachable.
+* **Rotation and translation on the spot:** This method has six parameters (and two pointers to the leg position arrays). Namely three (x-, y-, z-) translation values and three (roll, pitch, yaw) rotation values. The robot center is moved to match the given parameters, while all legs remain at their current position in the global coordinate frame. For example, a translation of xTrans = 30 means that the center of mass of the robot is shifted by 30mm to the front compared to home position, while an angle of roll = 0.2 (in radians) tilts the robot by approx. 11.5° sideways.
+* **Crab walking:** Still under developement...
+* **Future walking gate:** bla bla bla
+* **Offroad mode:** Uses the limit switches to move all legs until they touch the ground, allowing the robot to cross uneven terrain. All but the z positions of the legs is the same as in the crab walk gate.
+
+### Calculating points for each leg
+Since we have one coordinate frame in the center of mass of the robot and six local coordinate frames, one in the coxa joint of each leg, we need to convert between the frames. This can be done in multiple ways, for example using rotation matrices and shifting of the planes. 
+
+To calculate the new end point of a leg in the local coordinate frame resulting from a translation along one of the axis of the coordinate frame in the center of mass, we first need to shift and rotate the local frame to match the frame in the center of mass. In the example, this is done in the first 11 lines of code. In lines 5-7 the coordinate frame (more exact only the current end point) is rotated by 30° since the corner legs are mounted at an angle. 
+In lines 10-11 the frame is shifted so that both origins coincide.
+
+Now, the desired translation and rotation can be applied. First, in lines 14-16, the end point is shifted by the desired amount to achieve the translation. Second, the point is rotated by multiplying it with rotMatrix[][], which is a complete 3x3 roll pitch yaw rotation matrix.
+At last, the local coordinate frame has to be transformed back. This time, it is first shifted back and then rotated back by 30°.
+
+```
+// ++++++++++++++++++++++++++++++
+// leg front right
+// ++++++++++++++++++++++++++++++
+// rotate the local coordinate system by 30°
+int temp = newPositions[0][0];
+newPositions[0][0] = newPositions[0][0] * cos(-cornerLegAngle) - newPositions[0][1] * sin(-cornerLegAngle);
+newPositions[0][1] = temp * sin(-cornerLegAngle) + newPositions[0][1] * cos(-cornerLegAngle);
+
+//shift the local coordinate system to the center of mass
+newPositions[0][0] += cornerLegXDistGlobal;
+newPositions[0][1] += cornerLegYDistGlobal;
+
+// translation of leg end point
+newPositions[0][0] -= xTrans;
+newPositions[0][1] -= yTrans;
+newPositions[0][2] += zTrans;
+
+// rotating the end point using RotMatrix
+for (int i = 0; i < 3; ++i) {
+  result[i] = 0.0;
+}
+
+for (int i = 0; i < 3; ++i) {
+  for (int j = 0; j < 3; ++j) {
+    result[i] += (rotMatrix[i][j] * newPositions[0][j]);
+  }
+}
+for (int i = 0; i < 3; ++i) {
+  newPositions[0][i] = result[i];
+}
+
+//shift the local coordinate system back
+newPositions[0][0] -= cornerLegXDistGlobal;
+newPositions[0][1] -= cornerLegYDistGlobal;
+
+//rotate the coordinate system back by -30°
+temp = newPositions[0][0];
+newPositions[0][0] = newPositions[0][0] * cos(cornerLegAngle) - newPositions[0][1] * sin(cornerLegAngle);
+newPositions[0][1] = temp * sin(cornerLegAngle) + newPositions[0][1] * cos(cornerLegAngle);
+```
+
+All other legs follow the same principle, only the sign of some values and the amount by which the frames need to be shifted and rotated change.
+
+Improvements/additions would be to use quaternions for faster computation of the rotations or to just use 4x4 homogeneous matrices to first transform the coordinate frames and then calculate the translation and rotation in one step (and then transforming the frame back of course).
+
+### Main loop
+As already mentioned, the loop() function is called every 20ms. At the beginning of each loop() excecution, a method of the Hexapod class (e.g. Hexapod.calcCrabwalk()) can be called which modifies an array containing (x, y, z) positions for all six legs, writing the new values. Additionally, the Hexapod.calcBodyMovement() method is called **every** loop iteration which allows for flexible superimposition of body rotation and translation ontop of the movement of the robot.
+A counter keeps track of the number of loop() calls. This counter can be used to program sequences, e.g. three steps to the left, then rotating on the spot, four steps forward, ...
