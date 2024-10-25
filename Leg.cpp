@@ -223,4 +223,5 @@ inline bool Leg::isReachable(float L, int z) {
       return false;
     }
   }
+  return false;
 }

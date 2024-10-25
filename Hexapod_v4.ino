@@ -1,9 +1,9 @@
 // 4th generation Hexapod
-// Hardware is largely the same as v3 (white). Currently uses a Nano 33 IoT, but will likely be upgraded to use a Nano 33 BLE Sense v2
-// Completely new software, each leg is represented as a class with references to each servo
+// Hardware is largely the same as v3. Currently uses a Nano 33 BLE Sense Rev 2, but will also work on other capable
+// Arduinos like the Nano 33 IoT
+
 #include <Arduino_BMI270_BMM150.h>
 #include <Adafruit_PWMServoDriver.h>
-#include <SpeedTrig.h>
 #include "Config.h"
 #include "Hexapod.h"
 #include "Leg.h"
@@ -66,23 +66,26 @@ void setup() {
   // start the IMU
   if (!IMU.begin()) {
     Serial.println("IMU-Sensor couldn't be initialized!");
-    while (1)
-      ;
+    while (1);
   }
   delay(1000);
 
-  //Configure WDT.
+  // Configure WDT. Only uncomment this if it is your final version, since the watchdog prevents
+  // normal upload to the board. Otherwise it needs to be set to bootloader mode manually.
   /*NRF_WDT->CONFIG = 0x01;    // Configure WDT to run when CPU is asleep
   NRF_WDT->CRV = 65535;      // Timeout set to 2 seconds, timeout[s] = (CRV+1)/32768
   NRF_WDT->RREN = 0x01;      // Enable the RR[0] reload register
   NRF_WDT->TASKS_START = 1;  // Start WDT*/
 }
+
 void loop() {
   // get the current time
   unsigned long timeMillis = millis();
 
   // calculate the new leg position
   // ...
+
+  // This section activates offroad mode, using the limit switches
   /*if (myHexapod.getAction() == 0) {
     counter++;
     if (counter == 20) {
@@ -103,17 +106,29 @@ void loop() {
 
       myHexapod.calcBodyMovement(legPositions, legPositions, 0, 0, 0, roll, -pitch, 0.0);
     }
-  }*/
-  myHexapod.calcCrabwalk(legPositions, currPositions, 45, 0, 100);
+  }
+  myHexapod.calcCrabwalk(legPositions, currPositions, 30, 0, 100, 30, true);
+  */
 
-
-  /*if (counter % 5 == 2 || counter % 5 == 3 || counter % 5 == 4 || myHexapod.getAction() == 1) {
+  // This section is a preprogrammed walking sequence using the crab walk gate and also rotating on the spot.
+  // A counter keeps track of the iterations
+  /*
+  if (myHexapod.getAction() == 0) {
+    counter++;
+    if (counter == 20) {
+      counter = 0;
+    }
+  }
+  if (counter % 5 == 2 || counter % 5 == 3 || counter % 5 == 4 || myHexapod.getAction() == 1) {
     myHexapod.calcCrabwalk(legPositions, currPositions, 30, 0, 100);
   } else if (counter % 5 == 0 || counter % 5 == 1 || myHexapod.getAction() == 2) {
     myHexapod.calcRotatingStep(legPositions, currPositions, 0.19, 100);
   }
-  //myHexapod.calcCrabwalk(legPositions, currPositions, 20, dir, 100);
+  */
 
+  // This section is a preprogrammed sequence of crab walk steps. It doesn't use the counter (but this can 
+  // be changed easily) but instead counts how many loop() calls were made in total
+  /*
   if (loopCounter < 50) {
     int b = map(loopCounter, 0, 50, 0, 150);
     myHexapod.calcBodyMovement(currPositions, newPositions, 0, 0, 0, 0.0, b / 1000.0, 0.0);
@@ -166,7 +181,8 @@ void loop() {
     myHexapod.calcBodyMovement(currPositions, newPositions, 0, 0, 0, 0.0, 0.0, 0.0);
   }*/
 
-  myHexapod.calcBodyMovement(currPositions, newPositions, 0, 0, 10, 0.0, 0.0, 0.0);
+  // Adjust the body position each loop() iteration
+  myHexapod.calcBodyMovement(currPositions, newPositions, 0, 0, 0, 0.0, 0.0, 0.0);
 
   // update the leg position
   myHexapod.moveLegs(newPositions);
@@ -189,98 +205,7 @@ void loop() {
   //Serial.println(millis());
   // Reload the WDTs RR[0] reload register
   // if this line isn't called at least every 2 seconds, the TIMEOUT event is called and the CPU is reset
+  // uncomment this if the watchdog is used
   //NRF_WDT->RR[0] = WDT_RR_RR_Reload;
 }
-/*
-void loop() {
 
-  for (int i = 0; i <= 25; ++i) {
-    myHexapod.moveBodyCalc(legPositions, i, 0, 0, 0, 0, 0);
-    myHexapod.moveLegs(legPositions);
-    delay(5);
-  }
-
-  for (float i = 0.0; i <= 4 * PI; i += 0.05) {
-    myHexapod.moveBodyCalc(legPositions, 25 * cos(i), 25 * sin(i), 10 * sin(i), 0, 0, 0);
-    myHexapod.moveLegs(legPositions);
-    delay(5);
-  }
-  for (int i = 25; i >= 0; --i) {
-    myHexapod.moveBodyCalc(legPositions, i, 0, 0, 0, 0, 0);
-    myHexapod.moveLegs(legPositions);
-    delay(5);
-  }
-  for (int i = 0; i <= 30; ++i) {
-    myHexapod.moveBodyCalc(legPositions, 0, 0, 0, i / 100.0, 0, 0);
-    myHexapod.moveLegs(legPositions);
-    delay(5);
-  }
-  delay(100);
-  for (int i = 30; i >= -30; --i) {
-    myHexapod.moveBodyCalc(legPositions, 0, 0, 0, i / 100.0, 0, 0);
-    myHexapod.moveLegs(legPositions);
-    delay(5);
-  }
-  delay(100);
-  for (int i = -30; i <= 0; ++i) {
-    myHexapod.moveBodyCalc(legPositions, 0, 0, 0, i / 100.0, 0, 0);
-    myHexapod.moveLegs(legPositions);
-    delay(5);
-  }
-
-  delay(100);
-  for (int i = 0; i <= 30; ++i) {
-    myHexapod.moveBodyCalc(legPositions, 0, 0, 0, 0, i / 100.0, 0);
-    myHexapod.moveLegs(legPositions);
-    delay(5);
-  }
-  delay(100);
-  for (int i = 30; i >= -30; --i) {
-    myHexapod.moveBodyCalc(legPositions, 0, 0, 0, 0, i / 100.0, 0);
-    myHexapod.moveLegs(legPositions);
-    delay(5);
-  }
-  delay(100);
-  for (int i = -30; i <= 0; ++i) {
-    myHexapod.moveBodyCalc(legPositions, 0, 0, 0, 0, i / 100.0, 0);
-    myHexapod.moveLegs(legPositions);
-    delay(5);
-  }
-
-  delay(100);
-  for (int i = 0; i <= 30; ++i) {
-    myHexapod.moveBodyCalc(legPositions, 0, 0, 0, 0, 0, i / 100.0);
-    myHexapod.moveLegs(legPositions);
-    delay(5);
-  }
-  delay(100);
-  for (int i = 30; i >= -30; --i) {
-    myHexapod.moveBodyCalc(legPositions, 0, 0, 0, 0, 0, i / 100.0);
-    myHexapod.moveLegs(legPositions);
-    delay(5);
-  }
-  delay(100);
-  for (int i = -30; i <= 0; ++i) {
-    myHexapod.moveBodyCalc(legPositions, 0, 0, 0, 0, 0, i / 100.0);
-    myHexapod.moveLegs(legPositions);
-    delay(5);
-  }
-  delay(100);
-
-  for (int i = 0; i <= 100; ++i) {
-    float c = map(i, 0, 100, 0, 220) / 1000.0;
-    float d = map(i, 0, 100, 0, 300) / 1000.0;
-    myHexapod.moveBodyCalc(legPositions, 0, 0, 0, c, c, d);
-    myHexapod.moveLegs(legPositions);
-    delay(5);
-  }
-  delay(100);
-  for (int i = 100; i >= 0; --i) {
-    float c = map(i, 0, 100, 0, 220) / 1000.0;
-    float d = map(i, 0, 100, 0, 300) / 1000.0;
-    myHexapod.moveBodyCalc(legPositions, 0, 0, 0, c, c, d);
-    myHexapod.moveLegs(legPositions);
-    delay(5);
-  }
-  delay(100);
-}*/
