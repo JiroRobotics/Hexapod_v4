@@ -112,7 +112,7 @@ void loop() {
 
   // This section is a preprogrammed walking sequence using the crab walk gate and also rotating on the spot.
   // A counter keeps track of the iterations
-  /*
+  
   if (myHexapod.getAction() == 0) {
     counter++;
     if (counter == 20) {
@@ -124,7 +124,7 @@ void loop() {
   } else if (counter % 5 == 0 || counter % 5 == 1 || myHexapod.getAction() == 2) {
     myHexapod.calcRotatingStep(legPositions, currPositions, 0.19, 100);
   }
-  */
+  
 
   // This section is a preprogrammed sequence of crab walk steps. It doesn't use the counter (but this can 
   // be changed easily) but instead counts how many loop() calls were made in total
@@ -186,7 +186,7 @@ void loop() {
 
   // update the leg position
   myHexapod.moveLegs(newPositions);
-  //Serial.print("Zeit vor Pause: ");
+  //Serial.print("Millis before waiting: ");
   //Serial.println(millis());
   while (millis() < timeMillis + periodMs) {
     // wait a bit so that the loop is executet every 20ms
@@ -201,7 +201,7 @@ void loop() {
   } else {
     digitalWrite(LED_BUILTIN, LOW);
   }
-  //Serial.print("Zeit nach Pause: ");
+  //Serial.print("Millis after waiting: ");
   //Serial.println(millis());
   // Reload the WDTs RR[0] reload register
   // if this line isn't called at least every 2 seconds, the TIMEOUT event is called and the CPU is reset
