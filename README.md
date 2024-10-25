@@ -4,7 +4,13 @@
 
 ## Background
 
-This project is my fourth hexapod robot. It uses largely the same hardware as the previous generation but the code was rewritten entirely. Hexapods are walking robots with six legs, each leg (in this case) with three joints resulting in a total of 18 servo motors.
+Hexapods fascinating robots. They possess the ability to walk in any direction with their six legs, each leg (in this case) with three joints resulting in a total of 18 degrees of freedom. In addition, their body can turn and rotate in any direction, making this type of legged robot extremely flexible. But six legs also allow for fast, statically determined walking gates, i.e. lifting three legs each step. This removes the challenge of balancing during one step. 
+
+As written in the title, this project is my fourth hexapod robot. It uses largely the same hardware as the previous generation but the code was rewritten entirely. The ReadMe was written in order to provide support and document the whole project. Feel free to contact me for questions/suggestions/improvements.
+
+## Guidelines
+
+In addition to the code in this repository, you will need two additional libraries, "Adafruit_PWMServoDriver.h" and "Arduino_BMI270_BMM150.h" for the servo driver and the IMU respectively. Just clone this repository and adjust the code to suit your robot. Almost all important constants are specified in Config.h, but a few other things also need to be changed, e.g. the constraints for leg movement (more on that later) or the servo pulse lengths. This ReadMe is written in a way which should allow you to follow my thought process during the creation of this robot. It is quite extensive so don't be afraid to skip some parts. The code is mathematically challenging, so you should be familiar with the basics of inverse kinematics and coordinate transformation in order to understand everything.
 
 ## Hardware
 
@@ -45,7 +51,7 @@ The last thing to do is to actually move the servos. This can be achieved by cal
 ```
 servoDriver.setPWM(pinCoxa, 0, angle(coxaAngle + offsetCoxa));
 ```
-angle() is a function to convert the angle in degrees to the corresponding pulse width of the PWM signal (also described in the Adafruit Servo Driver documentation). offsetCoxa is the offset (in degrees) by which the (real) position of the leg differs compared to the ideal position. Find these values by assembling the robot, setting all servos to for example 90° and adjust the offsets until all joints are perfectly perpendicular.
+angle() is a function to convert the angle in degrees to the corresponding pulse width of the PWM signal (also described in the Adafruit Servo Driver documentation). The values in angle() have to be adjusted if another type of servo is used. offsetCoxa is the offset (in degrees) by which the (real) position of the leg differs compared to the ideal position. Find these values by assembling the robot, setting all servos to for example 90° and adjust the offsets until all joints are perfectly perpendicular.
 
 ### Calculating valid points
 The leg can't reach every (x, y, z) point in 3D space. If we instruct the leg to move to an unreachable point, weird things can happen, potentionally even breaking the robot. Even if all points passed to the leg function _should_ be reachable, it is recommended to implement the following as a last safeguard:
@@ -58,8 +64,8 @@ Instead of implementing constrains directly for tibiaAngle and femurAngle, we si
 As mentioned above, the six leg classes are passed to one Hexapod class which coordinates the legs and calculates all necessary points in the (local) coordinate system for each leg. The Hexapod class contains multiple methods for moving the robot:
 * **Leg movement:** This elementary method moves all six legs to their positions as specified in the array, if they are reachable.
 * **Rotation and translation on the spot:** This method has six parameters (and two pointers to the leg position arrays). Namely three (x-, y-, z-) translation values and three (roll, pitch, yaw) rotation values. The robot center is moved to match the given parameters, while all legs remain at their current position in the global coordinate frame. For example, a translation of xTrans = 30 means that the center of mass of the robot is shifted by 30mm to the front compared to home position, while an angle of roll = 0.2 (in radians) tilts the robot by approx. 11.5° sideways.
-* **Crab walking:** Still under developement...
-* **Future walking gate:** bla bla bla
+* **Crab walking:** Still under developement, a basic version is working but I have plans to improve it. 
+* **Future walking gate:** A basic version of this gate also exists. The robot will take a step forwards or backwards while tracing the perimeter of a circle with the specified radius.
 * **Offroad mode:** Uses the limit switches to move all legs until they touch the ground, allowing the robot to cross uneven terrain. All but the z positions of the legs is the same as in the crab walk gate.
 
 ### Calculating points for each leg
