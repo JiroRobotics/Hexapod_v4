@@ -74,7 +74,7 @@ const int8_t coxaOffsetRL = -2;
 const int8_t femurOffsetRL = 0;
 const int8_t tibiaOffsetRL = 5;
 
-// pins of the push-button on every leg
+// pins of the push-buttons on every leg
 const uint8_t buttonFR = 12;
 const uint8_t buttonFL = 9;
 const uint8_t buttonMR = 14;

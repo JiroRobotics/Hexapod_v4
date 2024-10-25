@@ -44,17 +44,12 @@ private:
   // 0 = sleeping / doing nothing
   // 1 = doing a crab walk step
   // 2 = rotating on the spot
+  // 3 = step with radius
   uint8_t action = 0;
 
   // z-coordinate of the robots center of mass (equivalent to the height of the coxa joints if rotation is zero)
   uint8_t zHeight = 80;
   // total orientation of the robots local coordinate system relative to the global coordinate system
-  float totalRoll = 0.0;
-  float totalPitch = 0.0;
-  float totalYaw = 0.0;
-  int16_t totalxTrans = 0;
-  int16_t totalyTrans = 0;
-  int16_t totalzTrans = 0;
   float averageHeight = 0.0f;
 
   // counter to keep track of the number of iterations in calcCrabwalk()
