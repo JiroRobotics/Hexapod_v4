@@ -1,5 +1,6 @@
 # Hexapod v4
 
+<img src="pictures/hexapod_v4_picture_2.jpg" alt="Hexapod prototype" width="600">
 
 
 ## Background
@@ -35,7 +36,9 @@ Let's take a look at the math-heavy challenges for this project
 ### Inverse kinematics of one leg
 **Goal:** given a point (x, y, z) in the local coordinate frame of the leg, calculate the joint angles of the three servo motors so that the end point of the leg reaches the desired point
 First, we assume that the point is valid/reachable (more on that later). Next we will have to take a look at the coordinate system and how the leg is positioned in it.
-![Image of a leg model and the coordinate system as well as L and L1](pictures/HexapodLegModel.png)
+
+<img src="pictures/HexapodLegModel.png" alt="Image of a leg model and the coordinate system as well as L and L1" width="600">
+
 A, B and C are the coxa, femur and tibia joints while D is the desired point given in (x, y, z) coordinates. It becomes apparent that the coxa angle is only dependent on the x and y and can be calculated by using the atan2(y, x) function. Note that this returns radians, so you might need to convert to degrees. Perhaps you also need to mirror the value using map(), depending on the servo orientation.
 The values for the femur and tibia joint are a bit more complex. First, we need to calculate two distances: L1 and L. L1 is simply the distance from the z-axis to point D, which can be found using the pythagorean theorem. L1 can than be used to calculate L, which is the distance from B to D. Again, it is found by using the pythagorean theorem. Now, by applying the law of cosine, the angles of the triangle BCD can be found. Make sure to shift/mirror the values to match the orientation of the servos. The code for calculating all three angles is as follows:
 
@@ -58,7 +61,7 @@ The leg can't reach every (x, y, z) point in 3D space. If we instruct the leg to
 The constrains for the coxaAngle parameter can be chosen by simply measuring how far the legs can rotate before hitting the neighboring leg rotating in the opposite direction. In this case, coxaAngle can only be in the interval [40°, 130°]
 Instead of implementing constrains directly for tibiaAngle and femurAngle, we simply look at the L1 value and the z value and define an area in which L1 and z have to be to be valid. This area can be found mathematically or approximated using a CAD model (as shown in the image). By comparing L1 and z to the upper and lower bound, each point can be verified.
 
-![Image of the area reachable by one leg](pictures/HexapodLegReach.PNG)
+<img src="pictures/HexapodLegReach.PNG" alt="Image of the area reachable by one leg" width="600">
 
 ### The Hexapod class
 As mentioned above, the six leg classes are passed to one Hexapod class which coordinates the legs and calculates all necessary points in the (local) coordinate system for each leg. The Hexapod class contains multiple methods for moving the robot:
@@ -122,6 +125,17 @@ newPositions[0][1] = temp * sin(cornerLegAngle) + newPositions[0][1] * cos(corne
 All other legs follow the same principle, only the sign of some values and the amount by which the frames need to be shifted and rotated change.
 
 Improvements/additions would be to use quaternions for faster computation of the rotations or to just use 4x4 homogeneous matrices to first transform the coordinate frames and then calculate the translation and rotation in one step (and then transforming the frame back of course).
+
+### Walking in any direction
+Two approaches exist to create a walking motion in any direction (aka crab walk). Both approaches lift three legs, while the other three legs move the body. For example, the front left, middle right and rear left legs are being lifted, while the front right, middle left and rear right legs push the hexapod in the desired direction. The first version is simpler, but doesn't allow for long step distances, thus resulting in a more "unnatural" motion:
+
+A "home position" is defined (in the local coordinate frame, as an (x, y, z) point), to which the three legs which were lifted return after every step. As a result, three legs are guaranteed to be at the home position in the beginning of each step. From there, new points are calculated for each of the three legs. These new points describe the final position of the legs at the end of the step. The other legs (which were previously **not** at home position) just return to home position.
+Final positions for the three legs can be calculated by simply transforming (rotating) the vector by which the hexapod moves in the local coordinate system and then subtracting the vector from the home position. This vector can be passed to the method as two parameters, namely stepDist and stepDirection. stepDist is the length of the vector by which the hexapod moves while stepDirection is the angle, in which the step is taken (simply a 2D-vector in polar coordinates). For example, stepDist = 20 and stepDirection = PI will result in a step with a length of 20mm backwards (PI (rad) = 180°).
+While providing a simple form of movement, which is also quite flexible (all possible steps can be executed after a step, the step length and direction is known, ...), it looks pretty unnatural. In addition, the maximum step length is short with only around 40mm. To achieve longer steps with more natural movement, another approach can be taken:
+
+In this approach, a "home position" is defined also. The leg isn't actually moved to the home position, but the position is used to construct a circle, in which the leg operates at every point in time. The size of the circle will later determine the maximum step length. The difference in comparison to the previous approach is the position at which the legs are after every step (obviously, duh...). After one step **all six** legs will be on the circumference of the circle. The three legs moving the hexapod will move from their current position in the given direction, until they hit the boundary of the circle. The three legs which were returning to home position in the previous approach will now be lifted and moved in the opposite direction until they hit the boundary of the circle, thus allowing the *next* step to be of maximum length. One can simply notice, that the maximum length can only be achieved if the next step is taken in the same direction as the previous and, in the worst case, no movement is possible at all. This worst case occurs if the next step is exactly in the opposite direction as the previous step. A better behaviour will result, if in advance of actually starting the step, the maximum step length is calculated for both three-leg-groups. Let's take a look at an example: the last step was taken forward, now legs front right, middle left and rear right will be in the optimal position to take the next step forward (this being the forwardmost position of the circle). The three other legs will be at the rearmost point of their circle respectively, having just moved the robot forward. If the (spontanious) decision is taken for the robot to move backwards, it woud be desireable to calculate the step length which will result for each three-leg-group in advance. The front right, middle left and rear right legs would have a step length of zero, since they already are at the forwardmost position in their circle. The three other legs, even tough they just excecuted the step, would have the maximum step length. Thus, the decision is taken to again lift the front right, middle left and rear right legs while the other three legs move the hexapod backwards, even if this contradicts the normal walking sequence (In the actual code, the exact step length isn't calculated, but the decision is rather based solely on the previous and next direction of travel. If the next step direction doesn't lie within +/-90° of the previous direction, the same three-leg-group which just moved the robot will also excecute the next step).
+
+(Image to be added)
 
 ### Main loop
 As already mentioned, the loop() function is called every 20ms. At the beginning of each loop() excecution, a method of the Hexapod class (e.g. Hexapod.calcCrabwalk()) can be called which modifies an array containing (x, y, z) positions for all six legs, writing the new values. Additionally, the Hexapod.calcBodyMovement() method is called **every** loop iteration which allows for flexible superimposition of body rotation and translation ontop of the movement of the robot.
