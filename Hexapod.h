@@ -16,6 +16,8 @@ public:
 
   // calculates the next position for crab movement for all legs and passes them to newPositions[][]
   bool calcCrabwalk(int prevPositions[6][3], int newPositions[6][3], uint16_t stepDist, float stepDirection, uint16_t stepNumber, uint8_t stepHeight = 20, bool useOffroad = false);
+  
+  bool calcCrabwalkFlush(int prevPositions[6][3], int newPositions[6][3], float stepDirection, uint8_t radius, uint16_t stepNumber, uint8_t stepHeight = 20);
 
   // calculates the next position for rotating on the spot and passes them to newPositions[][]
   bool calcRotatingStep(int prevPositions[6][3], int newPositions[6][3], float stepAngle, uint16_t stepNumber, uint8_t stepHeight = 20);
@@ -58,6 +60,9 @@ private:
   bool rightLegHome = true;
   bool leftLegHome = true;
   bool moveRightLeg = true;
+
+  float prevDirection = 0.0f;
+  bool prevRightMoved = true;
   // array to save the end points of a crab walk step
   int finalPositions[6][3] = { { homePos[0], homePos[1], homePos[2] },    // front right
                                { homePos[0], homePos[1], homePos[2] },    // front left

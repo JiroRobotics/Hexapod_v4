@@ -539,7 +539,7 @@ bool Hexapod::calcCrabwalk(int prevPositions[6][3], int newPositions[6][3], uint
       }
     } else {
       // do this the last 3 iterations of the step
-      // levels the robot and adjusts the height to an average of finalPosistions[x][2]
+      // levels the robot and adjusts the height to an average of finalPositions[x][2]
 
       // do this only once (the first time this case is called)
       if (stepCounter == stepNumber - 2) {
@@ -574,6 +574,184 @@ bool Hexapod::calcCrabwalk(int prevPositions[6][3], int newPositions[6][3], uint
       leftLegHome = false;
       rightLegHome = true;
     }
+    // copy the final positions (without translation and rotation) in the current position array
+    for (int i = 0; i < 6; ++i) {
+      for (int j = 0; j < 3; ++j) {
+        prevPositions[i][j] = newPositions[i][j];
+      }
+    }
+    // reset the step counter after one step is completed
+    stepCounter = 1;
+    // set action to 0, as the hexapod is now sleeping / doing nothing
+    action = 0;
+    return true;
+  }
+  stepCounter++;
+  return false;
+}
+
+bool Hexapod::calcCrabwalkFlush(int prevPositions[6][3], int newPositions[6][3], float stepDirection, uint8_t radius, uint16_t stepNumber, uint8_t stepHeight){
+  
+  if (!prevRightMoved && stepCounter == 1) {
+    
+    // calculate the end positions. Legs FR, ML, RR will move, FL, MR, RL will be lifted
+    // do this in the first iteration if three legs are at home position
+
+    action = 4;           // the hexapod is executing a step
+
+    // calculate the end position for each leg and save it along with the starting position and later interpolate the position for each iteration
+
+    // ++++++++++++++++++++++++++++++
+    // leg front right
+    // ++++++++++++++++++++++++++++++
+    float lx = prevPositions[0][0];
+    float ly = prevPositions[0][1];
+    while((lx-homePos[0])*(lx-homePos[0]) + (ly-homePos[1])*(ly-homePos[1]) < radius * radius){
+      lx -= cos(stepDirection + cornerLegAngle);
+      ly -= sin(stepDirection + cornerLegAngle);
+    }
+    finalPositions[0][0] = round(lx);
+    finalPositions[0][1] = round(ly);
+
+    // ++++++++++++++++++++++++++++++
+    // leg mid left
+    // ++++++++++++++++++++++++++++++
+    lx = prevPositions[3][0];
+    ly = prevPositions[3][1];
+    while((lx-homePos[0])*(lx-homePos[0]) + (ly-homePos[1])*(ly-homePos[1]) < radius * radius){
+      lx -= cos(stepDirection + PI);
+      ly -= sin(stepDirection + PI);
+    }
+    finalPositions[3][0] = round(lx);
+    finalPositions[3][1] = round(ly);
+
+    // ++++++++++++++++++++++++++++++
+    // leg rear right
+    // ++++++++++++++++++++++++++++++
+    lx = prevPositions[4][0];
+    ly = prevPositions[4][1];
+    while((lx-homePos[0])*(lx-homePos[0]) + (ly-homePos[1])*(ly-homePos[1]) < radius * radius){
+      lx -= cos(stepDirection - cornerLegAngle);
+      ly -= sin(stepDirection - cornerLegAngle);
+    }
+    finalPositions[4][0] = round(lx);
+    finalPositions[4][1] = round(ly);
+
+    // the three other legs move to the optimal position for the next step
+    finalPositions[1][0] = homePos[0] - radius * cos(stepDirection - cornerLegAngle);
+    finalPositions[1][1] = homePos[1] - radius * sin(stepDirection - cornerLegAngle);
+
+    finalPositions[2][0] = homePos[0] + radius * cos(stepDirection);
+    finalPositions[2][1] = homePos[1] + radius * sin(stepDirection);
+
+    finalPositions[5][0] = homePos[0] - radius * cos(stepDirection + cornerLegAngle);
+    finalPositions[5][1] = homePos[1] - radius * sin(stepDirection + cornerLegAngle);
+
+  } else if (prevRightMoved && stepCounter == 1) {
+    action = 4;
+
+    // ++++++++++++++++++++++++++++++
+    // leg front left
+    // ++++++++++++++++++++++++++++++
+    float lx = prevPositions[1][0];
+    float ly = prevPositions[1][1];
+    while((lx-homePos[0])*(lx-homePos[0]) + (ly-homePos[1])*(ly-homePos[1]) < radius * radius){
+      lx += cos(stepDirection - cornerLegAngle);
+      ly += sin(stepDirection - cornerLegAngle);
+    }
+    finalPositions[1][0] = round(lx);
+    finalPositions[1][1] = round(ly);
+
+    // ++++++++++++++++++++++++++++++
+    // leg mid right
+    // ++++++++++++++++++++++++++++++
+    lx = prevPositions[2][0];
+    ly = prevPositions[2][1];
+    while((lx-homePos[0])*(lx-homePos[0]) + (ly-homePos[1])*(ly-homePos[1]) < radius * radius){
+      lx -= cos(stepDirection);
+      ly -= sin(stepDirection);
+    }
+    finalPositions[2][0] = round(lx);
+    finalPositions[2][1] = round(ly);
+
+    // ++++++++++++++++++++++++++++++
+    // leg rear left
+    // ++++++++++++++++++++++++++++++
+    lx = prevPositions[5][0];
+    ly = prevPositions[5][1];
+    while((lx-homePos[0])*(lx-homePos[0]) + (ly-homePos[1])*(ly-homePos[1]) < radius * radius){
+      lx += cos(stepDirection + cornerLegAngle);
+      ly += sin(stepDirection + cornerLegAngle);
+    }
+    finalPositions[5][0] = round(lx);
+    finalPositions[5][1] = round(ly);
+
+    // the three other legs move to the optimal position for the next step
+    finalPositions[0][0] = homePos[0] + radius * cos(stepDirection + cornerLegAngle);
+    finalPositions[0][1] = homePos[1] + radius * sin(stepDirection + cornerLegAngle);
+
+    finalPositions[3][0] = homePos[0] - radius * cos(stepDirection + PI);
+    finalPositions[3][1] = homePos[1] - radius * sin(stepDirection + PI);
+
+    finalPositions[4][0] = homePos[0] + radius * cos(stepDirection - cornerLegAngle);
+    finalPositions[4][1] = homePos[1] + radius * sin(stepDirection - cornerLegAngle);
+
+  } else if (stepCounter == 1) {
+    //do this if the legs are not at home position
+  }
+
+  if (stepCounter > 0 && stepCounter <= stepNumber) {
+    // interpolate the current leg position. Using the map() function will result in a linear motion to the final position
+    for (int i = 0; i < 6; ++i) {
+      for (int j = 0; j < 3; ++j) {
+        newPositions[i][j] = map(stepCounter, 1, stepNumber, prevPositions[i][j], finalPositions[i][j]);
+      }
+    }
+    // this is necessary to lift the three legs returning home of the ground
+    if (stepCounter < ceil(stepNumber * 0.15)) {
+      // lift the three legs returning to home position
+      if (prevRightMoved) {
+        // lift legs FR, ML, RR
+        newPositions[0][2] = map(stepCounter, 1, ceil(stepNumber * 0.15), prevPositions[0][2], prevPositions[0][2] - stepHeight);
+        newPositions[3][2] = map(stepCounter, 1, ceil(stepNumber * 0.15), prevPositions[3][2], prevPositions[3][2] - stepHeight);
+        newPositions[4][2] = map(stepCounter, 1, ceil(stepNumber * 0.15), prevPositions[4][2], prevPositions[4][2] - stepHeight);
+      } else {
+        // lift legs FL, MR, RL
+        newPositions[1][2] = map(stepCounter, 1, ceil(stepNumber * 0.15), prevPositions[1][2], prevPositions[1][2] - stepHeight);
+        newPositions[2][2] = map(stepCounter, 1, ceil(stepNumber * 0.15), prevPositions[2][2], prevPositions[2][2] - stepHeight);
+        newPositions[5][2] = map(stepCounter, 1, ceil(stepNumber * 0.15), prevPositions[5][2], prevPositions[5][2] - stepHeight);
+      }
+    } else if (stepCounter > ceil(stepNumber * 0.85)) {
+      if (prevRightMoved) {
+        // lower legs FR, ML, RR
+        newPositions[0][2] = map(stepCounter, ceil(stepNumber * 0.85), stepNumber, prevPositions[0][2] - stepHeight, finalPositions[0][2]);
+        newPositions[3][2] = map(stepCounter, ceil(stepNumber * 0.85), stepNumber, prevPositions[3][2] - stepHeight, finalPositions[3][2]);
+        newPositions[4][2] = map(stepCounter, ceil(stepNumber * 0.85), stepNumber, prevPositions[4][2] - stepHeight, finalPositions[4][2]);
+      } else {
+        // lower legs FL, MR, RL
+        newPositions[1][2] = map(stepCounter, ceil(stepNumber * 0.85), stepNumber, prevPositions[1][2] - stepHeight, finalPositions[1][2]);
+        newPositions[2][2] = map(stepCounter, ceil(stepNumber * 0.85), stepNumber, prevPositions[2][2] - stepHeight, finalPositions[2][2]);
+        newPositions[5][2] = map(stepCounter, ceil(stepNumber * 0.85), stepNumber, prevPositions[5][2] - stepHeight, finalPositions[5][2]);
+      }
+    } else {
+      if (prevRightMoved) {
+        // lower legs FR, ML, RR
+        newPositions[0][2] = prevPositions[0][2] - stepHeight;
+        newPositions[3][2] = prevPositions[3][2] - stepHeight;
+        newPositions[4][2] = prevPositions[4][2] - stepHeight;
+      } else {
+        // lower legs FL, MR, RL
+        newPositions[1][2] = prevPositions[1][2] - stepHeight;
+        newPositions[2][2] = prevPositions[2][2] - stepHeight;
+        newPositions[5][2] = prevPositions[5][2] - stepHeight;
+      }
+    }
+  }
+
+  if (stepCounter == stepNumber) {
+    // do this if the max number of iterations is reached
+    // if the legs FR, ML and RR were at home position prior to the step, FL, MR and RL will now be at home position and vice versa
+    prevRightMoved = !prevRightMoved;
     // copy the final positions (without translation and rotation) in the current position array
     for (int i = 0; i < 6; ++i) {
       for (int j = 0; j < 3; ++j) {

@@ -112,7 +112,7 @@ void loop() {
 
   // This section is a preprogrammed walking sequence using the crab walk gate and also rotating on the spot.
   // A counter keeps track of the iterations
-  
+  /*
   if (myHexapod.getAction() == 0) {
     counter++;
     if (counter == 20) {
@@ -123,7 +123,7 @@ void loop() {
     myHexapod.calcCrabwalk(legPositions, currPositions, 30, 0, 100);
   } else if (counter % 5 == 0 || counter % 5 == 1 || myHexapod.getAction() == 2) {
     myHexapod.calcRotatingStep(legPositions, currPositions, 0.19, 100);
-  }
+  }*/
   
 
   // This section is a preprogrammed sequence of crab walk steps. It doesn't use the counter (but this can 
@@ -180,6 +180,8 @@ void loop() {
   } else {
     myHexapod.calcBodyMovement(currPositions, newPositions, 0, 0, 0, 0.0, 0.0, 0.0);
   }*/
+
+  myHexapod.calcCrabwalkFlush(legPositions, currPositions, 0.0, 20, 120);
 
   // Adjust the body position each loop() iteration
   myHexapod.calcBodyMovement(currPositions, newPositions, 0, 0, 0, 0.0, 0.0, 0.0);
