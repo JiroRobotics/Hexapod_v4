@@ -17,6 +17,8 @@ public:
   // calculates the next position for crab movement for all legs and passes them to newPositions[][]
   bool calcCrabwalk(int prevPositions[6][3], int newPositions[6][3], uint16_t stepDist, float stepDirection, uint16_t stepNumber, uint8_t stepHeight = 20, bool useOffroad = false);
 
+  bool calcCrabwalkFlush(int prevPositions[6][3], int newPositions[6][3], float stepDirection, uint8_t radius, uint16_t stepNumber, uint8_t stepHeight = 20);
+
   // calculates the next position for rotating on the spot and passes them to newPositions[][]
   bool calcRotatingStep(int prevPositions[6][3], int newPositions[6][3], float stepAngle, uint16_t stepNumber, uint8_t stepHeight = 20);
 
@@ -40,7 +42,7 @@ private:
   Leg &legRR;
   Leg &legRL;
 
-  // variable representing the current action of the hexapod. 
+  // variable representing the current action of the hexapod.
   // 0 = sleeping / doing nothing
   // 1 = doing a crab walk step
   // 2 = rotating on the spot
@@ -66,6 +68,8 @@ private:
                                { homePos[0], homePos[1], homePos[2] },    // rear right
                                { homePos[0], homePos[1], homePos[2] } };  // rear left
 
+  void lineCircleIntersect(int mX, int mY, int radius, int pX, int pY, float direction, int intersections[2][2]);
+    
 };
 
 #endif /* Hexapod_H */

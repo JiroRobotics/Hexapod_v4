@@ -590,6 +590,22 @@ bool Hexapod::calcCrabwalk(int prevPositions[6][3], int newPositions[6][3], uint
   return false;
 }
 
+bool Hexapod::calcCrabwalkFlush(int prevPositions[6][3], int newPositions[6][3], float stepDirection, uint8_t radius, uint16_t stepNumber, uint8_t stepHeight) {
+  /*
+   * new method for the second crad walk version
+   *
+   *
+   */
+
+  // figure out, which three legs will be lifted and which legs will stay on the ground
+  //...
+
+  // calculate the final point for the three legs on the ground
+  //... (circle around home position in global coordinate frame)
+
+  // transform the final point in the three local frames
+}
+
 bool Hexapod::calcRotatingStep(int prevPositions[6][3], int newPositions[6][3], float stepAngle, uint16_t stepNumber, uint8_t stepHeight) {
   /*
    * calculates the next position for a rotating step on the spot
@@ -1333,4 +1349,57 @@ bool Hexapod::moveLegs(int positions[6][3]) {
 
 [[nodiscard]] uint8_t Hexapod::getAction() {
   return action;
+}
+
+void Hexapod::lineCircleIntersect(int mX, int mY, int radius, int pX, int pY, float direction, int intersections[2][2]) {
+  /*
+   * calculates the two intersections of the line specified by pX and pY and direction with the 
+   * circle centered around mX, mY with the given radius
+   *
+   * mX, mY:          center of the circle, in mm
+   * radius:          radius of the circle, in mm
+   * pX, pY:          point on the line, e.g. last/current position of the leg
+   * direction:       heading of the line, [0, 2*PI]
+   * intersections:   array containing the two intersections. (intersection[0][0], intersection[0][1]) is the first
+   */
+  // Verschiebe den Punkt (pX, pY) in ein Koordinatensystem mit dem Kreis im Ursprung
+  int shiftedPX = pX - mX;
+  int shiftedPY = pY - mY;
+
+  // Richtung in Integer-Komponenten aufteilen mit weniger Skalierung
+  int scaleFactor = 100;
+  int dx = cos(direction) * scaleFactor + 0.5;
+  int dy = sin(direction) * scaleFactor + 0.5;
+
+  // Quadratische Koeffizienten
+  int a = dx * dx + dy * dy;
+  int b = 2 * (dx * shiftedPX + dy * shiftedPY);
+  int c = shiftedPX * shiftedPX + shiftedPY * shiftedPY - radius * radius;
+
+  int discriminant = b * b - 4 * a * c;
+
+  if (discriminant < 0) {
+    // Kein Schnittpunkt, leere Ergebnisse setzen (z.B., -1 als Kennzeichnung)
+    intersections[0][0] = intersections[0][1] = -1;
+    intersections[1][0] = intersections[1][1] = -1;
+    return;
+  }
+
+  int sqrt_discriminant = sqrt(discriminant) + 0.5;
+
+  // Erst teilen, dann skalieren für präzisere t-Werte
+  double t1 = (-b + sqrt_discriminant) / (2.0 * a);
+  double t2 = (-b - sqrt_discriminant) / (2.0 * a);
+
+  // Berechne und verschiebe den ersten Schnittpunkt zurück
+  intersections[0][0] = shiftedPX + t1 * dx + mX;
+  intersections[0][1] = shiftedPY + t1 * dy + mY;
+
+  // Berechne und verschiebe den zweiten Schnittpunkt zurück, falls vorhanden
+  if (discriminant > 0) {
+    intersections[1][0] = shiftedPX + t2 * dx + mX;
+    intersections[1][1] = shiftedPY + t2 * dy + mY;
+  } else {
+    intersections[1][0] = intersections[1][1] = -1;  // Kein zweiter Schnittpunkt
+  }
 }
