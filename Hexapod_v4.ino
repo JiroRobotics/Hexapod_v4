@@ -42,7 +42,14 @@ uint8_t counter = 0;
 void setup() {
   // use the builtin LED on pin 13 as an OUTPUT
   pinMode(LED_BUILTIN, OUTPUT);
+  pinMode(LED_RED, OUTPUT);
+  pinMode(LED_BLUE, OUTPUT);
+  pinMode(LED_GREEN, OUTPUT);
   digitalWrite(LED_BUILTIN, LOW);
+  // Built in RGB is inverted
+  digitalWrite(LED_RED, HIGH);
+  digitalWrite(LED_BLUE, HIGH);
+  digitalWrite(LED_GREEN, HIGH);
   // use all the push buttons on the legs as INPUT
   pinMode(buttonFR, INPUT);
   pinMode(buttonFL, INPUT);
@@ -66,7 +73,8 @@ void setup() {
   // start the IMU
   if (!IMU.begin()) {
     Serial.println("IMU-Sensor couldn't be initialized!");
-    while (1);
+    while (1)
+      ;
   }
   delay(1000);
 
@@ -85,103 +93,22 @@ void loop() {
   // calculate the new leg position
   // ...
 
-  // This section activates offroad mode, using the limit switches
-  /*if (myHexapod.getAction() == 0) {
-    counter++;
-    if (counter == 20) {
-      counter = 0;
-    }
-
-    float accX, accY, accZ;
-
-    // read the acceleration
-    if (IMU.accelerationAvailable()) {
-      IMU.readAcceleration(accX, accY, accZ);
-
-      // calculate the angle in radias
-      float pitch = atan2(accY, accZ);
-      float roll = atan2(accY, accX);
-      pitch = pitch - PI / 2.0 + 0.04;
-      roll -= PI / 2.0;
-
-      myHexapod.calcBodyMovement(legPositions, legPositions, 0, 0, 0, roll, -pitch, 0.0);
-    }
-  }
-  myHexapod.calcCrabwalk(legPositions, currPositions, 30, 0, 100, 30, true);
-  */
-
-  // This section is a preprogrammed walking sequence using the crab walk gate and also rotating on the spot.
-  // A counter keeps track of the iterations
-  /*
   if (myHexapod.getAction() == 0) {
     counter++;
     if (counter == 20) {
       counter = 0;
     }
   }
-  if (counter % 5 == 2 || counter % 5 == 3 || counter % 5 == 4 || myHexapod.getAction() == 1) {
-    myHexapod.calcCrabwalk(legPositions, currPositions, 30, 0, 100);
-  } else if (counter % 5 == 0 || counter % 5 == 1 || myHexapod.getAction() == 2) {
-    myHexapod.calcRotatingStep(legPositions, currPositions, 0.19, 100);
-  }*/
-  
 
-  // This section is a preprogrammed sequence of crab walk steps. It doesn't use the counter (but this can 
-  // be changed easily) but instead counts how many loop() calls were made in total
-  /*
-  if (loopCounter < 50) {
-    int b = map(loopCounter, 0, 50, 0, 150);
-    myHexapod.calcBodyMovement(currPositions, newPositions, 0, 0, 0, 0.0, b / 1000.0, 0.0);
-
-  } else if (loopCounter < 150) {
-    myHexapod.calcBodyMovement(currPositions, newPositions, 0, 0, 0, 0.0, 0.15, 0.0);
-
-  } else if (loopCounter < 250) {
-    int b = map(loopCounter, 150, 250, 150, -150);
-    myHexapod.calcBodyMovement(currPositions, newPositions, 0, 0, 0, 0.0, b / 1000.0, 0.0);
-
-  } else if (loopCounter < 350) {
-    myHexapod.calcBodyMovement(currPositions, newPositions, 0, 0, 0, 0.0, -0.15, 0.0);
-
-  } else if (loopCounter < 400) {
-    int b = map(loopCounter, 350, 400, -150, 0);
-    myHexapod.calcBodyMovement(currPositions, newPositions, 0, 0, 0, 0.0, b / 1000.0, 0.0);
-
-  } else if (loopCounter < 450) {
-    int b = map(loopCounter, 400, 450, 0, 150);
-    myHexapod.calcBodyMovement(currPositions, newPositions, 0, 0, 0, b / 1000.0, 0.0, 0.0);
-
-  } else if (loopCounter < 550) {
-    int b = map(loopCounter, 450, 550, 150, -150);
-    myHexapod.calcBodyMovement(currPositions, newPositions, 0, 0, 0, b / 1000.0, 0.0, 0.0);
-
-  } else if (loopCounter < 600) {
-    int b = map(loopCounter, 550, 600, -150, 0);
-    myHexapod.calcBodyMovement(currPositions, newPositions, 0, 0, 0, b / 1000.0, 0.0, 0.0);
-
-  } else if (loopCounter < 650) {
-    int b = map(loopCounter, 600, 650, 0, 20);
-    myHexapod.calcBodyMovement(currPositions, newPositions, 0, 0, b, 0.0, 0.0, 0.0);
-
-  } else if (loopCounter < 750) {
-    myHexapod.calcBodyMovement(currPositions, newPositions, 0, 0, 20, 0.0, 0.0, 0.0);
-
-  } else if (loopCounter < 850) {
-    int b = map(loopCounter, 750, 850, 20, -20);
-    myHexapod.calcBodyMovement(currPositions, newPositions, 0, 0, b, 0.0, 0.0, 0.0);
-
-  } else if (loopCounter < 950) {
-    myHexapod.calcBodyMovement(currPositions, newPositions, 0, 0, -20, 0.0, 0.0, 0.0);
-
-  } else if (loopCounter < 1000) {
-    int b = map(loopCounter, 950, 1000, -20, 0);
-    myHexapod.calcBodyMovement(currPositions, newPositions, 0, 0, b, 0.0, 0.0, 0.0);
-
+  if (counter < 5) {
+    myHexapod.calcCrabwalkFlush(legPositions, currPositions, PI / 4, 30, 100);
+  } else if (counter < 10) {
+    myHexapod.calcCrabwalkFlush(legPositions, currPositions, 0, 30, 100);
+  } else if (counter < 15) {
+    myHexapod.calcCrabwalkFlush(legPositions, currPositions, PI, 30, 100);
   } else {
-    myHexapod.calcBodyMovement(currPositions, newPositions, 0, 0, 0, 0.0, 0.0, 0.0);
-  }*/
-
-  myHexapod.calcCrabwalkFlush(legPositions, currPositions, 0.0, 20, 120);
+    myHexapod.calcCrabwalkFlush(legPositions, currPositions, 3*PI/4, 30, 100);
+  }
 
   // Adjust the body position each loop() iteration
   myHexapod.calcBodyMovement(currPositions, newPositions, 0, 0, 0, 0.0, 0.0, 0.0);
@@ -210,4 +137,3 @@ void loop() {
   // uncomment this if the watchdog is used
   //NRF_WDT->RR[0] = WDT_RR_RR_Reload;
 }
-

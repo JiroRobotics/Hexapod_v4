@@ -42,11 +42,12 @@ private:
   Leg &legRR;
   Leg &legRL;
 
-  // variable representing the current action of the hexapod. 
+  // variable representing the current action of the hexapod.
   // 0 = sleeping / doing nothing
   // 1 = doing a crab walk step
   // 2 = rotating on the spot
   // 3 = step with radius
+  // 5 = new CrabWalk
   uint8_t action = 0;
 
   // z-coordinate of the robots center of mass (equivalent to the height of the coxa joints if rotation is zero)
@@ -61,8 +62,9 @@ private:
   bool leftLegHome = true;
   bool moveRightLeg = true;
 
-  float prevDirection = 0.0f;
-  bool prevRightMoved = true;
+  float prevDirection = 0.0;
+  bool prevRightLeg = true;
+
   // array to save the end points of a crab walk step
   int finalPositions[6][3] = { { homePos[0], homePos[1], homePos[2] },    // front right
                                { homePos[0], homePos[1], homePos[2] },    // front left
@@ -71,6 +73,10 @@ private:
                                { homePos[0], homePos[1], homePos[2] },    // rear right
                                { homePos[0], homePos[1], homePos[2] } };  // rear left
 
+  void lineCircleIntersect(int mX, int mY, int radius, int pX, int pY, float direction, int intersections[2][2]);
+
+  int getOppositeIntersection(int pX, int pY, float direction, int intersections[2][2]);
+    
 };
 
 #endif /* Hexapod_H */

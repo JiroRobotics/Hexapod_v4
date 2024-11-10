@@ -590,116 +590,149 @@ bool Hexapod::calcCrabwalk(int prevPositions[6][3], int newPositions[6][3], uint
   return false;
 }
 
-bool Hexapod::calcCrabwalkFlush(int prevPositions[6][3], int newPositions[6][3], float stepDirection, uint8_t radius, uint16_t stepNumber, uint8_t stepHeight){
-  
-  if (!prevRightMoved && stepCounter == 1) {
-    
-    // calculate the end positions. Legs FR, ML, RR will move, FL, MR, RL will be lifted
-    // do this in the first iteration if three legs are at home position
+bool Hexapod::calcCrabwalkFlush(int prevPositions[6][3], int newPositions[6][3], float stepDirection, uint8_t radius, uint16_t stepNumber, uint8_t stepHeight) {
+  /*
+   * new method for the second crad walk version
+   *
+   *
+   */
 
-    action = 4;           // the hexapod is executing a step
 
-    // calculate the end position for each leg and save it along with the starting position and later interpolate the position for each iteration
+  // figure out, which three legs will be lifted and which legs will stay on the ground
+  if (stepCounter == 1) {
+    action = 5;
+    if ((prevRightLeg == false && abs(stepDirection - prevDirection) <= PI / 2) || (prevRightLeg == true && abs(stepDirection - prevDirection) > PI / 2)) {
+      // move fr, ml, rr and lift fl, mr, rl
+      moveRightLeg = true;
+      int intersections[2][2] = { 0 };
+      //------------------------------
+      // Front Left Leg
+      //------------------------------
+      finalPositions[1][0] = homePos[0] + radius * cos(stepDirection + cornerLegAngle * 5) * 1.0;
+      finalPositions[1][1] = homePos[1] + radius * sin(stepDirection + cornerLegAngle * 5) * 1.0;
+      //------------------------------
+      // Middle Right Leg
+      //------------------------------
+      // move the leg to the optimal position for the next step, assuming the next step is in the same direction
+      finalPositions[2][0] = homePos[0] + radius * cos(stepDirection) * 1.0;
+      finalPositions[2][1] = homePos[1] + radius * sin(stepDirection) * 1.0;
+      //------------------------------
+      // Rear Left Leg
+      //------------------------------
+      finalPositions[5][0] = homePos[0] + radius * cos(stepDirection + cornerLegAngle * 7) * 1.0;
+      finalPositions[5][1] = homePos[1] + radius * sin(stepDirection + cornerLegAngle * 7) * 1.0;
 
-    // ++++++++++++++++++++++++++++++
-    // leg front right
-    // ++++++++++++++++++++++++++++++
-    float lx = prevPositions[0][0];
-    float ly = prevPositions[0][1];
-    while((lx-homePos[0])*(lx-homePos[0]) + (ly-homePos[1])*(ly-homePos[1]) < radius * radius){
-      lx -= cos(stepDirection + cornerLegAngle);
-      ly -= sin(stepDirection + cornerLegAngle);
+      //------------------------------
+      // Front Right Leg
+      //------------------------------
+      lineCircleIntersect(homePos[0], homePos[1], radius, prevPositions[0][0], prevPositions[0][1], stepDirection + cornerLegAngle, intersections);
+      int index = getOppositeIntersection(prevPositions[0][0], prevPositions[0][1], stepDirection + cornerLegAngle, intersections);
+      // intersections[index][0] and intersections[index][1] are the final x/y leg positions (if they exist)
+      if (intersections[index][0] != -1 && intersections[index][1] != -1) {
+        finalPositions[0][0] = intersections[index][0];
+        finalPositions[0][1] = intersections[index][1];
+      } else {
+        // if there is no intersection, just leave the legs where they are
+        finalPositions[0][0] = prevPositions[0][0];
+        finalPositions[0][1] = prevPositions[0][1];
+      }
+
+      //------------------------------
+      // Middle Left Leg
+      //------------------------------
+      lineCircleIntersect(homePos[0], homePos[1], radius, prevPositions[3][0], prevPositions[3][1], stepDirection + cornerLegAngle * 6, intersections);
+      index = getOppositeIntersection(prevPositions[3][0], prevPositions[3][1], stepDirection + cornerLegAngle * 6, intersections);
+      // intersections[index][0] and intersections[index][1] are the final x/y leg positions (if they exist)
+      if (intersections[index][0] != -1 && intersections[index][1] != -1) {
+        finalPositions[3][0] = intersections[index][0];
+        finalPositions[3][1] = intersections[index][1];
+      } else {
+        // if there is no intersection, just leave the legs where they are
+        finalPositions[3][0] = prevPositions[3][0];
+        finalPositions[3][1] = prevPositions[3][1];
+      }
+
+      //------------------------------
+      // Rear Right Leg
+      //------------------------------
+      lineCircleIntersect(homePos[0], homePos[1], radius, prevPositions[4][0], prevPositions[4][1], stepDirection - cornerLegAngle, intersections);
+      index = getOppositeIntersection(prevPositions[4][0], prevPositions[4][1], stepDirection - cornerLegAngle, intersections);
+      // intersections[index][0] and intersections[index][1] are the final x/y leg positions (if they exist)
+      if (intersections[index][0] != -1 && intersections[index][1] != -1) {
+        finalPositions[4][0] = intersections[index][0];
+        finalPositions[4][1] = intersections[index][1];
+      } else {
+        // if there is no intersection, just leave the legs where they are
+        finalPositions[4][0] = prevPositions[4][0];
+        finalPositions[4][1] = prevPositions[4][1];
+      }
+
+    } else {
+      // move fl, mr, rl and lift fr, ml, rr
+      moveRightLeg = false;
+      int intersections[2][2] = { 0 };
+
+      //------------------------------
+      // Front Right Leg
+      //------------------------------
+      finalPositions[0][0] = homePos[0] + radius * cos(stepDirection + cornerLegAngle) * 1.0;
+      finalPositions[0][1] = homePos[1] + radius * sin(stepDirection + cornerLegAngle) * 1.0;
+      //------------------------------
+      // Middle Left Leg
+      //------------------------------
+      finalPositions[3][0] = homePos[0] + radius * cos(stepDirection + cornerLegAngle * 6) * 1.0;
+      finalPositions[3][1] = homePos[1] + radius * sin(stepDirection + cornerLegAngle * 6) * 1.0;
+      //------------------------------
+      // Rear Right Leg
+      //------------------------------
+      finalPositions[4][0] = homePos[0] + radius * cos(stepDirection - cornerLegAngle) * 1.0;
+      finalPositions[4][1] = homePos[1] + radius * sin(stepDirection - cornerLegAngle) * 1.0;
+      //------------------------------
+      // Front Left Leg
+      //------------------------------
+      lineCircleIntersect(homePos[0], homePos[1], radius, prevPositions[1][0], prevPositions[1][1], stepDirection + cornerLegAngle * 5, intersections);
+      int index = getOppositeIntersection(prevPositions[1][0], prevPositions[1][1], stepDirection + cornerLegAngle * 5, intersections);
+      // intersections[index][0] and intersections[index][1] are the final x/y leg positions (if they exist)
+      if (intersections[index][0] != -1 && intersections[index][1] != -1) {
+        finalPositions[1][0] = intersections[index][0];
+        finalPositions[1][1] = intersections[index][1];
+      } else {
+        // if there is no intersection, just leave the legs where they are
+        finalPositions[1][0] = prevPositions[1][0];
+        finalPositions[1][1] = prevPositions[1][1];
+      }
+      //------------------------------
+      // Middle Right Leg
+      //------------------------------
+      lineCircleIntersect(homePos[0], homePos[1], radius, prevPositions[2][0], prevPositions[2][1], stepDirection, intersections);
+      index = getOppositeIntersection(prevPositions[2][0], prevPositions[2][1], stepDirection, intersections);
+      // intersections[index][0] and intersections[index][1] are the final x/y leg positions (if they exist)
+      if (intersections[index][0] != -1 && intersections[index][1] != -1) {
+        finalPositions[2][0] = intersections[index][0];
+        finalPositions[2][1] = intersections[index][1];
+      } else {
+        // if there is no intersection, just leave the legs where they are
+        finalPositions[2][0] = prevPositions[2][0];
+        finalPositions[2][1] = prevPositions[2][1];
+      }
+      //------------------------------
+      // Rear Left Leg
+      //------------------------------
+      lineCircleIntersect(homePos[0], homePos[1], radius, prevPositions[5][0], prevPositions[5][1], stepDirection + cornerLegAngle * 7, intersections);
+      index = getOppositeIntersection(prevPositions[5][0], prevPositions[5][1], stepDirection + cornerLegAngle * 7, intersections);
+      // intersections[index][0] and intersections[index][1] are the final x/y leg positions (if they exist)
+      if (intersections[index][0] != -1 && intersections[index][1] != -1) {
+        finalPositions[5][0] = intersections[index][0];
+        finalPositions[5][1] = intersections[index][1];
+      } else {
+        // if there is no intersection, just leave the legs where they are
+        finalPositions[5][0] = prevPositions[5][0];
+        finalPositions[5][1] = prevPositions[5][1];
+      }
     }
-    finalPositions[0][0] = round(lx);
-    finalPositions[0][1] = round(ly);
-
-    // ++++++++++++++++++++++++++++++
-    // leg mid left
-    // ++++++++++++++++++++++++++++++
-    lx = prevPositions[3][0];
-    ly = prevPositions[3][1];
-    while((lx-homePos[0])*(lx-homePos[0]) + (ly-homePos[1])*(ly-homePos[1]) < radius * radius){
-      lx -= cos(stepDirection + PI);
-      ly -= sin(stepDirection + PI);
-    }
-    finalPositions[3][0] = round(lx);
-    finalPositions[3][1] = round(ly);
-
-    // ++++++++++++++++++++++++++++++
-    // leg rear right
-    // ++++++++++++++++++++++++++++++
-    lx = prevPositions[4][0];
-    ly = prevPositions[4][1];
-    while((lx-homePos[0])*(lx-homePos[0]) + (ly-homePos[1])*(ly-homePos[1]) < radius * radius){
-      lx -= cos(stepDirection - cornerLegAngle);
-      ly -= sin(stepDirection - cornerLegAngle);
-    }
-    finalPositions[4][0] = round(lx);
-    finalPositions[4][1] = round(ly);
-
-    // the three other legs move to the optimal position for the next step
-    finalPositions[1][0] = homePos[0] - radius * cos(stepDirection - cornerLegAngle);
-    finalPositions[1][1] = homePos[1] - radius * sin(stepDirection - cornerLegAngle);
-
-    finalPositions[2][0] = homePos[0] + radius * cos(stepDirection);
-    finalPositions[2][1] = homePos[1] + radius * sin(stepDirection);
-
-    finalPositions[5][0] = homePos[0] - radius * cos(stepDirection + cornerLegAngle);
-    finalPositions[5][1] = homePos[1] - radius * sin(stepDirection + cornerLegAngle);
-
-  } else if (prevRightMoved && stepCounter == 1) {
-    action = 4;
-
-    // ++++++++++++++++++++++++++++++
-    // leg front left
-    // ++++++++++++++++++++++++++++++
-    float lx = prevPositions[1][0];
-    float ly = prevPositions[1][1];
-    while((lx-homePos[0])*(lx-homePos[0]) + (ly-homePos[1])*(ly-homePos[1]) < radius * radius){
-      lx += cos(stepDirection - cornerLegAngle);
-      ly += sin(stepDirection - cornerLegAngle);
-    }
-    finalPositions[1][0] = round(lx);
-    finalPositions[1][1] = round(ly);
-
-    // ++++++++++++++++++++++++++++++
-    // leg mid right
-    // ++++++++++++++++++++++++++++++
-    lx = prevPositions[2][0];
-    ly = prevPositions[2][1];
-    while((lx-homePos[0])*(lx-homePos[0]) + (ly-homePos[1])*(ly-homePos[1]) < radius * radius){
-      lx -= cos(stepDirection);
-      ly -= sin(stepDirection);
-    }
-    finalPositions[2][0] = round(lx);
-    finalPositions[2][1] = round(ly);
-
-    // ++++++++++++++++++++++++++++++
-    // leg rear left
-    // ++++++++++++++++++++++++++++++
-    lx = prevPositions[5][0];
-    ly = prevPositions[5][1];
-    while((lx-homePos[0])*(lx-homePos[0]) + (ly-homePos[1])*(ly-homePos[1]) < radius * radius){
-      lx += cos(stepDirection + cornerLegAngle);
-      ly += sin(stepDirection + cornerLegAngle);
-    }
-    finalPositions[5][0] = round(lx);
-    finalPositions[5][1] = round(ly);
-
-    // the three other legs move to the optimal position for the next step
-    finalPositions[0][0] = homePos[0] + radius * cos(stepDirection + cornerLegAngle);
-    finalPositions[0][1] = homePos[1] + radius * sin(stepDirection + cornerLegAngle);
-
-    finalPositions[3][0] = homePos[0] - radius * cos(stepDirection + PI);
-    finalPositions[3][1] = homePos[1] - radius * sin(stepDirection + PI);
-
-    finalPositions[4][0] = homePos[0] + radius * cos(stepDirection - cornerLegAngle);
-    finalPositions[4][1] = homePos[1] + radius * sin(stepDirection - cornerLegAngle);
-
-  } else if (stepCounter == 1) {
-    //do this if the legs are not at home position
   }
 
+  // actually move the legs to the mapped position
   if (stepCounter > 0 && stepCounter <= stepNumber) {
     // interpolate the current leg position. Using the map() function will result in a linear motion to the final position
     for (int i = 0; i < 6; ++i) {
@@ -710,7 +743,7 @@ bool Hexapod::calcCrabwalkFlush(int prevPositions[6][3], int newPositions[6][3],
     // this is necessary to lift the three legs returning home of the ground
     if (stepCounter < ceil(stepNumber * 0.15)) {
       // lift the three legs returning to home position
-      if (prevRightMoved) {
+      if (moveRightLeg == false) {
         // lift legs FR, ML, RR
         newPositions[0][2] = map(stepCounter, 1, ceil(stepNumber * 0.15), prevPositions[0][2], prevPositions[0][2] - stepHeight);
         newPositions[3][2] = map(stepCounter, 1, ceil(stepNumber * 0.15), prevPositions[3][2], prevPositions[3][2] - stepHeight);
@@ -722,7 +755,7 @@ bool Hexapod::calcCrabwalkFlush(int prevPositions[6][3], int newPositions[6][3],
         newPositions[5][2] = map(stepCounter, 1, ceil(stepNumber * 0.15), prevPositions[5][2], prevPositions[5][2] - stepHeight);
       }
     } else if (stepCounter > ceil(stepNumber * 0.85)) {
-      if (prevRightMoved) {
+      if (moveRightLeg == false) {
         // lower legs FR, ML, RR
         newPositions[0][2] = map(stepCounter, ceil(stepNumber * 0.85), stepNumber, prevPositions[0][2] - stepHeight, finalPositions[0][2]);
         newPositions[3][2] = map(stepCounter, ceil(stepNumber * 0.85), stepNumber, prevPositions[3][2] - stepHeight, finalPositions[3][2]);
@@ -734,13 +767,13 @@ bool Hexapod::calcCrabwalkFlush(int prevPositions[6][3], int newPositions[6][3],
         newPositions[5][2] = map(stepCounter, ceil(stepNumber * 0.85), stepNumber, prevPositions[5][2] - stepHeight, finalPositions[5][2]);
       }
     } else {
-      if (prevRightMoved) {
-        // lower legs FR, ML, RR
+      if (moveRightLeg == false) {
+        // keep FR, ML, RR lifted
         newPositions[0][2] = prevPositions[0][2] - stepHeight;
         newPositions[3][2] = prevPositions[3][2] - stepHeight;
         newPositions[4][2] = prevPositions[4][2] - stepHeight;
       } else {
-        // lower legs FL, MR, RL
+        // keep FL, MR, RL lifted
         newPositions[1][2] = prevPositions[1][2] - stepHeight;
         newPositions[2][2] = prevPositions[2][2] - stepHeight;
         newPositions[5][2] = prevPositions[5][2] - stepHeight;
@@ -748,14 +781,24 @@ bool Hexapod::calcCrabwalkFlush(int prevPositions[6][3], int newPositions[6][3],
     }
   }
 
+
+  // transform the final point in the three local frames
   if (stepCounter == stepNumber) {
     // do this if the max number of iterations is reached
-    // if the legs FR, ML and RR were at home position prior to the step, FL, MR and RL will now be at home position and vice versa
-    prevRightMoved = !prevRightMoved;
+    if (moveRightLeg) {
+      // that means that fr, ml, rl have moved
+      prevRightLeg = true;
+    } else {
+      prevRightLeg = false;
+    }
+
+    // save the step direction
+    prevDirection = stepDirection;
+
     // copy the final positions (without translation and rotation) in the current position array
     for (int i = 0; i < 6; ++i) {
       for (int j = 0; j < 3; ++j) {
-        prevPositions[i][j] = newPositions[i][j];
+        prevPositions[i][j] = finalPositions[i][j];
       }
     }
     // reset the step counter after one step is completed
@@ -1511,4 +1554,78 @@ bool Hexapod::moveLegs(int positions[6][3]) {
 
 [[nodiscard]] uint8_t Hexapod::getAction() {
   return action;
+}
+
+void Hexapod::lineCircleIntersect(int mX, int mY, int radius, int pX, int pY, float direction, int intersections[2][2]) {
+  /*
+   * calculates the two intersections of the line specified by pX and pY and direction with the 
+   * circle centered around mX, mY with the given radius
+   *
+   * mX, mY:          center of the circle, in mm
+   * radius:          radius of the circle, in mm
+   * pX, pY:          point on the line, e.g. last/current position of the leg
+   * direction:       heading of the line, [0, 2*PI]
+   * intersections:   array containing the two intersections. (intersection[0][0], intersection[0][1]) is the first
+   */
+  // Verschiebe den Punkt (pX, pY) in ein Koordinatensystem mit dem Kreis im Ursprung
+  int shiftedPX = pX - mX;
+  int shiftedPY = pY - mY;
+
+  // Richtung in Integer-Komponenten aufteilen mit weniger Skalierung
+  int scaleFactor = 100;
+  int dx = cos(direction) * scaleFactor + 0.5;
+  int dy = sin(direction) * scaleFactor + 0.5;
+
+  // Quadratische Koeffizienten
+  int a = dx * dx + dy * dy;
+  int b = 2 * (dx * shiftedPX + dy * shiftedPY);
+  int c = shiftedPX * shiftedPX + shiftedPY * shiftedPY - radius * radius;
+
+  int discriminant = b * b - 4 * a * c;
+
+  if (discriminant < 0) {
+    // Kein Schnittpunkt, leere Ergebnisse setzen (z.B., -1 als Kennzeichnung)
+    intersections[0][0] = intersections[0][1] = -1;
+    intersections[1][0] = intersections[1][1] = -1;
+    return;
+  }
+
+  int sqrt_discriminant = sqrt(discriminant) + 0.5;
+
+  // Erst teilen, dann skalieren für präzisere t-Werte
+  float t1 = (-b + sqrt_discriminant) / (2.0 * a);
+  float t2 = (-b - sqrt_discriminant) / (2.0 * a);
+
+  // Berechne und verschiebe den ersten Schnittpunkt zurück
+  intersections[0][0] = shiftedPX + t1 * dx + mX;
+  intersections[0][1] = shiftedPY + t1 * dy + mY;
+
+  // Berechne und verschiebe den zweiten Schnittpunkt zurück, falls vorhanden
+  if (discriminant > 0) {
+    intersections[1][0] = shiftedPX + t2 * dx + mX;
+    intersections[1][1] = shiftedPY + t2 * dy + mY;
+  } else {
+    intersections[1][0] = intersections[1][1] = -1;  // Kein zweiter Schnittpunkt
+  }
+}
+
+
+// Funktion, die den Schnittpunkt bestimmt, der weiter entgegengesetzt zur Richtung liegt
+int Hexapod::getOppositeIntersection(int pX, int pY, float direction, int intersections[2][2]) {
+  // Umgekehrter Richtungsvektor
+  float oppositeDX = -cos(direction);
+  float oppositeDY = -sin(direction);
+
+  // Projektion des Vektors vom Punkt p zum ersten Schnittpunkt auf den umgekehrten Richtungsvektor
+  float vector1X = intersections[0][0] - pX;
+  float vector1Y = intersections[0][1] - pY;
+  float projection1 = vector1X * oppositeDX + vector1Y * oppositeDY;
+
+  // Projektion des Vektors vom Punkt p zum zweiten Schnittpunkt auf den umgekehrten Richtungsvektor
+  float vector2X = intersections[1][0] - pX;
+  float vector2Y = intersections[1][1] - pY;
+  float projection2 = vector2X * oppositeDX + vector2Y * oppositeDY;
+
+  // Wähle den Punkt mit der größeren Projektion in die entgegengesetzte Richtung
+  return (projection1 > projection2) ? 0 : 1;
 }
