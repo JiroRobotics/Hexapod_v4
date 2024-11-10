@@ -73,8 +73,7 @@ void setup() {
   // start the IMU
   if (!IMU.begin()) {
     Serial.println("IMU-Sensor couldn't be initialized!");
-    while (1)
-      ;
+    while (1);
   }
   delay(1000);
 
@@ -91,15 +90,17 @@ void loop() {
   unsigned long timeMillis = millis();
 
   // calculate the new leg position
-  // ...
 
+  // keep track of the number of steps
   if (myHexapod.getAction() == 0) {
+    // increase the counter each time the robot is resting
     counter++;
     if (counter == 20) {
       counter = 0;
     }
   }
 
+  // do five steps each in different directions
   if (counter < 5) {
     myHexapod.calcCrabwalkFlush(legPositions, currPositions, PI / 4, 30, 100);
   } else if (counter < 10) {
@@ -115,23 +116,24 @@ void loop() {
 
   // update the leg position
   myHexapod.moveLegs(newPositions);
-  //Serial.print("Millis before waiting: ");
-  //Serial.println(millis());
-  while (millis() < timeMillis + periodMs) {
-    // wait a bit so that the loop is executet every 20ms
-  }
+  
   // increment the loopCounter to keep track of the number of loop cycles
   loopCounter++;
   if (loopCounter == 2000) {
     loopCounter = 0;
   }
-  if (loopCounter % 2) {
+  if (loopCounter % 2) {      // turn the led on and of to show each loop iteration
     digitalWrite(LED_BUILTIN, HIGH);
   } else {
     digitalWrite(LED_BUILTIN, LOW);
   }
-  //Serial.print("Millis after waiting: ");
-  //Serial.println(millis());
+  Serial.print("Millis before waiting: ");
+  Serial.println(millis());
+  while (millis() < timeMillis + periodMs) {
+    // wait a bit so that the loop is executet every 20ms
+  }
+  Serial.print("Millis after waiting: ");
+  Serial.println(millis());
   // Reload the WDTs RR[0] reload register
   // if this line isn't called at least every 2 seconds, the TIMEOUT event is called and the CPU is reset
   // uncomment this if the watchdog is used

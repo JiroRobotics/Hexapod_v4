@@ -592,28 +592,38 @@ bool Hexapod::calcCrabwalk(int prevPositions[6][3], int newPositions[6][3], uint
 
 bool Hexapod::calcCrabwalkFlush(int prevPositions[6][3], int newPositions[6][3], float stepDirection, uint8_t radius, uint16_t stepNumber, uint8_t stepHeight) {
   /*
-   * new method for the second crad walk version
+   * Second crabwalk version. Doesn't start at the default home position each step and doesn't move one set of legs back to home position.
+   * One set of legs moves the robot, the other set moves to the best spot for the next step, assuming the next step is taken in the same
+   * direction. If the next step direction differs from the previous, the set of legs which can take the longest step in the new direction
+   * moves the robot. The other set again moves to the optimal position for the next step.
    *
+   * prevPositions: array containing all leg positions prior to the step. Only gets updated in the last iteration when the step is finished
+   * newPositions:  array to save the new leg positions to
+   * stepDirection: angle (in radians) of the step. 0 is forwards, PI is backwards, PI/2 is to the right.
+   * radius:        the radius of the circle which the leg tip can't leave. Corresponds to the optimal step length.
+   * stepNumber:    number of iterations for one whole step
+   * stepHeight:    distance (in mm) by which the legs are raised to return home. Default: 20mm
    *
+   * returns:       false if the robot is executing a step, true if the step has just finished
    */
-
-
-  // figure out, which three legs will be lifted and which legs will stay on the ground
+  
   if (stepCounter == 1) {
-    action = 5;
+    action = 5;   // the robot is executing a step
+    // figure out which three legs will be lifted and which legs will stay on the ground
     if ((prevRightLeg == false && abs(stepDirection - prevDirection) <= PI / 2) || (prevRightLeg == true && abs(stepDirection - prevDirection) > PI / 2)) {
       // move fr, ml, rr and lift fl, mr, rl
       moveRightLeg = true;
-      int intersections[2][2] = { 0 };
+      int intersections[2][2] = { 0 };    // array containing the intersections of the line of the leg tip and the circle
       //------------------------------
       // Front Left Leg
       //------------------------------
+      // move the leg to the optimal position for the next step, assuming the next step is in the same direction
+      // the optimal leg position for the next step lies on the circle circumference in the opposite direction of movement
       finalPositions[1][0] = homePos[0] + radius * cos(stepDirection + cornerLegAngle * 5) * 1.0;
       finalPositions[1][1] = homePos[1] + radius * sin(stepDirection + cornerLegAngle * 5) * 1.0;
       //------------------------------
       // Middle Right Leg
       //------------------------------
-      // move the leg to the optimal position for the next step, assuming the next step is in the same direction
       finalPositions[2][0] = homePos[0] + radius * cos(stepDirection) * 1.0;
       finalPositions[2][1] = homePos[1] + radius * sin(stepDirection) * 1.0;
       //------------------------------
@@ -625,6 +635,8 @@ bool Hexapod::calcCrabwalkFlush(int prevPositions[6][3], int newPositions[6][3],
       //------------------------------
       // Front Right Leg
       //------------------------------
+      // the leg tip moves from the current position in a straight line in the given direction. Find the intersection of this line with the circle
+      // which is the furthest in this direction:
       lineCircleIntersect(homePos[0], homePos[1], radius, prevPositions[0][0], prevPositions[0][1], stepDirection + cornerLegAngle, intersections);
       int index = getOppositeIntersection(prevPositions[0][0], prevPositions[0][1], stepDirection + cornerLegAngle, intersections);
       // intersections[index][0] and intersections[index][1] are the final x/y leg positions (if they exist)
@@ -640,6 +652,7 @@ bool Hexapod::calcCrabwalkFlush(int prevPositions[6][3], int newPositions[6][3],
       //------------------------------
       // Middle Left Leg
       //------------------------------
+      // the same for all other legs. Only the direction needs to be transformed to the local coordinate system
       lineCircleIntersect(homePos[0], homePos[1], radius, prevPositions[3][0], prevPositions[3][1], stepDirection + cornerLegAngle * 6, intersections);
       index = getOppositeIntersection(prevPositions[3][0], prevPositions[3][1], stepDirection + cornerLegAngle * 6, intersections);
       // intersections[index][0] and intersections[index][1] are the final x/y leg positions (if they exist)
@@ -671,7 +684,7 @@ bool Hexapod::calcCrabwalkFlush(int prevPositions[6][3], int newPositions[6][3],
       // move fl, mr, rl and lift fr, ml, rr
       moveRightLeg = false;
       int intersections[2][2] = { 0 };
-
+      // again the same as previous, only for the other set of legs
       //------------------------------
       // Front Right Leg
       //------------------------------
@@ -781,8 +794,6 @@ bool Hexapod::calcCrabwalkFlush(int prevPositions[6][3], int newPositions[6][3],
     }
   }
 
-
-  // transform the final point in the three local frames
   if (stepCounter == stepNumber) {
     // do this if the max number of iterations is reached
     if (moveRightLeg) {
@@ -791,7 +802,6 @@ bool Hexapod::calcCrabwalkFlush(int prevPositions[6][3], int newPositions[6][3],
     } else {
       prevRightLeg = false;
     }
-
     // save the step direction
     prevDirection = stepDirection;
 
@@ -1567,16 +1577,16 @@ void Hexapod::lineCircleIntersect(int mX, int mY, int radius, int pX, int pY, fl
    * direction:       heading of the line, [0, 2*PI]
    * intersections:   array containing the two intersections. (intersection[0][0], intersection[0][1]) is the first
    */
-  // Verschiebe den Punkt (pX, pY) in ein Koordinatensystem mit dem Kreis im Ursprung
+  // Shift the point (pX, pY) to the origin of the coordinate frame
   int shiftedPX = pX - mX;
   int shiftedPY = pY - mY;
 
-  // Richtung in Integer-Komponenten aufteilen mit weniger Skalierung
+  // Split the direction in x and y components. Integer for faster computation
   int scaleFactor = 100;
   int dx = cos(direction) * scaleFactor + 0.5;
   int dy = sin(direction) * scaleFactor + 0.5;
 
-  // Quadratische Koeffizienten
+  // coefficents for qudratic formula
   int a = dx * dx + dy * dy;
   int b = 2 * (dx * shiftedPX + dy * shiftedPY);
   int c = shiftedPX * shiftedPX + shiftedPY * shiftedPY - radius * radius;
@@ -1584,48 +1594,54 @@ void Hexapod::lineCircleIntersect(int mX, int mY, int radius, int pX, int pY, fl
   int discriminant = b * b - 4 * a * c;
 
   if (discriminant < 0) {
-    // Kein Schnittpunkt, leere Ergebnisse setzen (z.B., -1 als Kennzeichnung)
+    // if there are no coefficients, set intersections to -1
     intersections[0][0] = intersections[0][1] = -1;
     intersections[1][0] = intersections[1][1] = -1;
     return;
   }
-
+  // approximate the sqrt
   int sqrt_discriminant = sqrt(discriminant) + 0.5;
 
-  // Erst teilen, dann skalieren für präzisere t-Werte
+  // calculate the quadratic formula
   float t1 = (-b + sqrt_discriminant) / (2.0 * a);
   float t2 = (-b - sqrt_discriminant) / (2.0 * a);
 
-  // Berechne und verschiebe den ersten Schnittpunkt zurück
+  // calculate and shift the intersections back
   intersections[0][0] = shiftedPX + t1 * dx + mX;
   intersections[0][1] = shiftedPY + t1 * dy + mY;
 
-  // Berechne und verschiebe den zweiten Schnittpunkt zurück, falls vorhanden
+  // calculate the second intersection if there is one
   if (discriminant > 0) {
     intersections[1][0] = shiftedPX + t2 * dx + mX;
     intersections[1][1] = shiftedPY + t2 * dy + mY;
   } else {
-    intersections[1][0] = intersections[1][1] = -1;  // Kein zweiter Schnittpunkt
+    intersections[1][0] = intersections[1][1] = -1;
   }
 }
 
 
-// Funktion, die den Schnittpunkt bestimmt, der weiter entgegengesetzt zur Richtung liegt
 int Hexapod::getOppositeIntersection(int pX, int pY, float direction, int intersections[2][2]) {
-  // Umgekehrter Richtungsvektor
+  /*
+   * Returns the intersection which lies further in the passed direction.
+   *
+   * pX, pY:          the previous leg point (support point of the line)
+   * direction:       direction of movement (heading of the line)
+   * intersections:   the previously calculated intersections of the line with the circle
+   */
+  // reverse direction
   float oppositeDX = -cos(direction);
   float oppositeDY = -sin(direction);
 
-  // Projektion des Vektors vom Punkt p zum ersten Schnittpunkt auf den umgekehrten Richtungsvektor
+  // project the vector from (pX, pY) to the first intersection onto the reverse direction
   float vector1X = intersections[0][0] - pX;
   float vector1Y = intersections[0][1] - pY;
   float projection1 = vector1X * oppositeDX + vector1Y * oppositeDY;
 
-  // Projektion des Vektors vom Punkt p zum zweiten Schnittpunkt auf den umgekehrten Richtungsvektor
+  // project the vector from (pX, pY) to the second intersectiononto the reverse direction
   float vector2X = intersections[1][0] - pX;
   float vector2Y = intersections[1][1] - pY;
   float projection2 = vector2X * oppositeDX + vector2Y * oppositeDY;
 
-  // Wähle den Punkt mit der größeren Projektion in die entgegengesetzte Richtung
+  // choose the point whose projection onto the direction is larger
   return (projection1 > projection2) ? 0 : 1;
 }

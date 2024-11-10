@@ -5,7 +5,7 @@
 
 ## Background
 
-Hexapods fascinating robots. They possess the ability to walk in any direction with their six legs, each leg (in this case) with three joints resulting in a total of 18 degrees of freedom. In addition, their body can turn and rotate in any direction, making this type of legged robot extremely flexible. But six legs also allow for fast, statically determined walking gates, i.e. lifting three legs each step. This removes the challenge of balancing during one step. 
+Hexapods are six legged robots. They possess the ability to walk in any direction, each leg (in this case) with three joints resulting in a total of 18 degrees of freedom. In addition, their body can turn and rotate in any direction, making this type of legged robot extremely flexible. But six legs also allow for fast, statically determined walking gates, i.e. lifting three legs each step while the three other legs stay on the ground. This removes the challenge of balancing during one step. 
 
 As written in the title, this project is my fourth hexapod robot. It uses largely the same hardware as the previous generation but the code was rewritten entirely. The ReadMe was written in order to provide support and document the whole project. Feel free to contact me for questions/suggestions/improvements.
 
