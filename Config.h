@@ -59,7 +59,7 @@ const int8_t femurOffsetFL = -4;
 const int8_t tibiaOffsetFL = 5;
 
 const int8_t coxaOffsetMR = -2;
-const int8_t femurOffsetMR = 5;
+const int8_t femurOffsetMR = -4;
 const int8_t tibiaOffsetMR = 8;
 
 const int8_t coxaOffsetML = -10;

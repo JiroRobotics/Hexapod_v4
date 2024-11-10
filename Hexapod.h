@@ -31,6 +31,8 @@ public:
   // method to instantly move the legs to their positions as specified in the array
   bool moveLegs(int positions[6][3]);
 
+  int getOppositeIntersection(int pX, int pY, float direction, int intersections[2][2]);
+
   // returns the action which the hexapod performs at the moment. 0 = sleeping / doing nothing. 1 = doing a crabwalk step. 2 = rotating on the spot
   [[nodiscard]] uint8_t getAction();
 
@@ -47,6 +49,7 @@ private:
   // 1 = doing a crab walk step
   // 2 = rotating on the spot
   // 3 = step with radius
+  // 5 = new CrabWalk
   uint8_t action = 0;
 
   // z-coordinate of the robots center of mass (equivalent to the height of the coxa joints if rotation is zero)
@@ -60,6 +63,9 @@ private:
   bool rightLegHome = true;
   bool leftLegHome = true;
   bool moveRightLeg = true;
+
+  float prevDirection = 0.0;
+  bool prevRightLeg = true;
   // array to save the end points of a crab walk step
   int finalPositions[6][3] = { { homePos[0], homePos[1], homePos[2] },    // front right
                                { homePos[0], homePos[1], homePos[2] },    // front left
