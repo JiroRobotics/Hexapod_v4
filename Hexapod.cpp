@@ -750,7 +750,7 @@ bool Hexapod::calcCrabwalkFlush(int prevPositions[6][3], int newPositions[6][3],
     // interpolate the current leg position. Using the map() function will result in a linear motion to the final position
     for (int i = 0; i < 6; ++i) {
       for (int j = 0; j < 3; ++j) {
-        newPositions[i][j] = map(stepCounter, 1, stepNumber, prevPositions[i][j], finalPositions[i][j]);
+        newPositions[i][j] = map(stepCounter, 0, stepNumber, prevPositions[i][j], finalPositions[i][j]);
       }
     }
     // this is necessary to lift the three legs returning home of the ground
@@ -758,26 +758,26 @@ bool Hexapod::calcCrabwalkFlush(int prevPositions[6][3], int newPositions[6][3],
       // lift the three legs returning to home position
       if (moveRightLeg == false) {
         // lift legs FR, ML, RR
-        newPositions[0][2] = map(stepCounter, 1, ceil(stepNumber * 0.15), prevPositions[0][2], prevPositions[0][2] - stepHeight);
-        newPositions[3][2] = map(stepCounter, 1, ceil(stepNumber * 0.15), prevPositions[3][2], prevPositions[3][2] - stepHeight);
-        newPositions[4][2] = map(stepCounter, 1, ceil(stepNumber * 0.15), prevPositions[4][2], prevPositions[4][2] - stepHeight);
+        newPositions[0][2] = map(stepCounter, 0, ceil(stepNumber * 0.15), prevPositions[0][2], prevPositions[0][2] - stepHeight);
+        newPositions[3][2] = map(stepCounter, 0, ceil(stepNumber * 0.15), prevPositions[3][2], prevPositions[3][2] - stepHeight);
+        newPositions[4][2] = map(stepCounter, 0, ceil(stepNumber * 0.15), prevPositions[4][2], prevPositions[4][2] - stepHeight);
       } else {
         // lift legs FL, MR, RL
-        newPositions[1][2] = map(stepCounter, 1, ceil(stepNumber * 0.15), prevPositions[1][2], prevPositions[1][2] - stepHeight);
-        newPositions[2][2] = map(stepCounter, 1, ceil(stepNumber * 0.15), prevPositions[2][2], prevPositions[2][2] - stepHeight);
-        newPositions[5][2] = map(stepCounter, 1, ceil(stepNumber * 0.15), prevPositions[5][2], prevPositions[5][2] - stepHeight);
+        newPositions[1][2] = map(stepCounter, 0, ceil(stepNumber * 0.15), prevPositions[1][2], prevPositions[1][2] - stepHeight);
+        newPositions[2][2] = map(stepCounter, 0, ceil(stepNumber * 0.15), prevPositions[2][2], prevPositions[2][2] - stepHeight);
+        newPositions[5][2] = map(stepCounter, 0, ceil(stepNumber * 0.15), prevPositions[5][2], prevPositions[5][2] - stepHeight);
       }
-    } else if (stepCounter > ceil(stepNumber * 0.85)) {
+    } else if (stepCounter > floor(stepNumber * 0.85)) {
       if (moveRightLeg == false) {
         // lower legs FR, ML, RR
-        newPositions[0][2] = map(stepCounter, ceil(stepNumber * 0.85), stepNumber, prevPositions[0][2] - stepHeight, finalPositions[0][2]);
-        newPositions[3][2] = map(stepCounter, ceil(stepNumber * 0.85), stepNumber, prevPositions[3][2] - stepHeight, finalPositions[3][2]);
-        newPositions[4][2] = map(stepCounter, ceil(stepNumber * 0.85), stepNumber, prevPositions[4][2] - stepHeight, finalPositions[4][2]);
+        newPositions[0][2] = map(stepCounter, floor(stepNumber * 0.85), stepNumber, prevPositions[0][2] - stepHeight, finalPositions[0][2]);
+        newPositions[3][2] = map(stepCounter, floor(stepNumber * 0.85), stepNumber, prevPositions[3][2] - stepHeight, finalPositions[3][2]);
+        newPositions[4][2] = map(stepCounter, floor(stepNumber * 0.85), stepNumber, prevPositions[4][2] - stepHeight, finalPositions[4][2]);
       } else {
         // lower legs FL, MR, RL
-        newPositions[1][2] = map(stepCounter, ceil(stepNumber * 0.85), stepNumber, prevPositions[1][2] - stepHeight, finalPositions[1][2]);
-        newPositions[2][2] = map(stepCounter, ceil(stepNumber * 0.85), stepNumber, prevPositions[2][2] - stepHeight, finalPositions[2][2]);
-        newPositions[5][2] = map(stepCounter, ceil(stepNumber * 0.85), stepNumber, prevPositions[5][2] - stepHeight, finalPositions[5][2]);
+        newPositions[1][2] = map(stepCounter, floor(stepNumber * 0.85), stepNumber, prevPositions[1][2] - stepHeight, finalPositions[1][2]);
+        newPositions[2][2] = map(stepCounter, floor(stepNumber * 0.85), stepNumber, prevPositions[2][2] - stepHeight, finalPositions[2][2]);
+        newPositions[5][2] = map(stepCounter, floor(stepNumber * 0.85), stepNumber, prevPositions[5][2] - stepHeight, finalPositions[5][2]);
       }
     } else {
       if (moveRightLeg == false) {
