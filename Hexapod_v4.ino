@@ -95,20 +95,20 @@ void loop() {
   if (myHexapod.getAction() == 0) {
     // increase the counter each time the robot is resting
     counter++;
-    if (counter == 20) {
+    if (counter == 25) {
       counter = 0;
     }
   }
 
-  // do five steps each in different directions
+  // do a couple steps in different directions
   if (counter < 5) {
-    myHexapod.calcCrabwalkFlush(legPositions, currPositions, PI / 4, 30, 100);
-  } else if (counter < 10) {
-    myHexapod.calcCrabwalkFlush(legPositions, currPositions, 0, 30, 100);
+    myHexapod.calcCrabwalkFlush(legPositions, currPositions, PI / 4, 30, 10);
   } else if (counter < 15) {
-    myHexapod.calcCrabwalkFlush(legPositions, currPositions, PI, 30, 100);
+    myHexapod.calcCrabwalkFlush(legPositions, currPositions, 0, 30, 10);
+  } else if (counter < 20) {
+    myHexapod.calcCrabwalkFlush(legPositions, currPositions, PI, 30, 10);
   } else {
-    myHexapod.calcCrabwalkFlush(legPositions, currPositions, 3*PI/4, 30, 100);
+    myHexapod.calcCrabwalkFlush(legPositions, currPositions, 3*PI/4, 30, 10);
   }
 
   // Adjust the body position each loop() iteration
@@ -127,13 +127,17 @@ void loop() {
   } else {
     digitalWrite(LED_BUILTIN, LOW);
   }
-  Serial.print("Millis before waiting: ");
-  Serial.println(millis());
+
+  // Make sure that the arduino is fast enough to calculate everything in periodMS time span
+  //Serial.print("Millis before waiting: ");
+  //Serial.println(millis());
   while (millis() < timeMillis + periodMs) {
     // wait a bit so that the loop is executet every 20ms
   }
-  Serial.print("Millis after waiting: ");
-  Serial.println(millis());
+  //Serial.print("Millis after waiting: ");
+  //Serial.println(millis());
+
+
   // Reload the WDTs RR[0] reload register
   // if this line isn't called at least every 2 seconds, the TIMEOUT event is called and the CPU is reset
   // uncomment this if the watchdog is used
