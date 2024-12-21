@@ -606,14 +606,14 @@ bool Hexapod::calcCrabwalkFlush(int prevPositions[6][3], int newPositions[6][3],
    *
    * returns:       false if the robot is executing a step, true if the step has just finished
    */
-  
+
   if (stepCounter == 1) {
-    action = 5;   // the robot is executing a step
+    action = 5;  // the robot is executing a step
     // figure out which three legs will be lifted and which legs will stay on the ground
     if ((prevRightLeg == false && abs(stepDirection - prevDirection) <= PI / 2) || (prevRightLeg == true && abs(stepDirection - prevDirection) > PI / 2)) {
       // move fr, ml, rr and lift fl, mr, rl
       moveRightLeg = true;
-      int intersections[2][2] = { 0 };    // array containing the intersections of the line of the leg tip and the circle
+      int intersections[2][2] = { 0 };  // array containing the intersections of the line of the leg tip and the circle
       //------------------------------
       // Front Left Leg
       //------------------------------
@@ -748,50 +748,7 @@ bool Hexapod::calcCrabwalkFlush(int prevPositions[6][3], int newPositions[6][3],
   // actually move the legs to the mapped position
   if (stepCounter > 0 && stepCounter <= stepNumber) {
     // interpolate the current leg position. Using the map() function will result in a linear motion to the final position
-    for (int i = 0; i < 6; ++i) {
-      for (int j = 0; j < 3; ++j) {
-        newPositions[i][j] = map(stepCounter, 0, stepNumber, prevPositions[i][j], finalPositions[i][j]);
-      }
-    }
-    // this is necessary to lift the three legs returning home of the ground
-    if (stepCounter < ceil(stepNumber * 0.15)) {
-      // lift the three legs returning to home position
-      if (moveRightLeg == false) {
-        // lift legs FR, ML, RR
-        newPositions[0][2] = map(stepCounter, 0, ceil(stepNumber * 0.15), prevPositions[0][2], prevPositions[0][2] - stepHeight);
-        newPositions[3][2] = map(stepCounter, 0, ceil(stepNumber * 0.15), prevPositions[3][2], prevPositions[3][2] - stepHeight);
-        newPositions[4][2] = map(stepCounter, 0, ceil(stepNumber * 0.15), prevPositions[4][2], prevPositions[4][2] - stepHeight);
-      } else {
-        // lift legs FL, MR, RL
-        newPositions[1][2] = map(stepCounter, 0, ceil(stepNumber * 0.15), prevPositions[1][2], prevPositions[1][2] - stepHeight);
-        newPositions[2][2] = map(stepCounter, 0, ceil(stepNumber * 0.15), prevPositions[2][2], prevPositions[2][2] - stepHeight);
-        newPositions[5][2] = map(stepCounter, 0, ceil(stepNumber * 0.15), prevPositions[5][2], prevPositions[5][2] - stepHeight);
-      }
-    } else if (stepCounter > floor(stepNumber * 0.85)) {
-      if (moveRightLeg == false) {
-        // lower legs FR, ML, RR
-        newPositions[0][2] = map(stepCounter, floor(stepNumber * 0.85), stepNumber, prevPositions[0][2] - stepHeight, finalPositions[0][2]);
-        newPositions[3][2] = map(stepCounter, floor(stepNumber * 0.85), stepNumber, prevPositions[3][2] - stepHeight, finalPositions[3][2]);
-        newPositions[4][2] = map(stepCounter, floor(stepNumber * 0.85), stepNumber, prevPositions[4][2] - stepHeight, finalPositions[4][2]);
-      } else {
-        // lower legs FL, MR, RL
-        newPositions[1][2] = map(stepCounter, floor(stepNumber * 0.85), stepNumber, prevPositions[1][2] - stepHeight, finalPositions[1][2]);
-        newPositions[2][2] = map(stepCounter, floor(stepNumber * 0.85), stepNumber, prevPositions[2][2] - stepHeight, finalPositions[2][2]);
-        newPositions[5][2] = map(stepCounter, floor(stepNumber * 0.85), stepNumber, prevPositions[5][2] - stepHeight, finalPositions[5][2]);
-      }
-    } else {
-      if (moveRightLeg == false) {
-        // keep FR, ML, RR lifted
-        newPositions[0][2] = prevPositions[0][2] - stepHeight;
-        newPositions[3][2] = prevPositions[3][2] - stepHeight;
-        newPositions[4][2] = prevPositions[4][2] - stepHeight;
-      } else {
-        // keep FL, MR, RL lifted
-        newPositions[1][2] = prevPositions[1][2] - stepHeight;
-        newPositions[2][2] = prevPositions[2][2] - stepHeight;
-        newPositions[5][2] = prevPositions[5][2] - stepHeight;
-      }
-    }
+    interpolateStep(newPositions, prevPositions, finalPositions, stepHeight, stepCounter, stepNumber, moveRightLeg);
   }
 
   if (stepCounter == stepNumber) {
@@ -815,6 +772,7 @@ bool Hexapod::calcCrabwalkFlush(int prevPositions[6][3], int newPositions[6][3],
     stepCounter = 1;
     // set action to 0, as the hexapod is now sleeping / doing nothing
     action = 0;
+    prevAction = 5;
     return true;
   }
   stepCounter++;
@@ -1644,4 +1602,82 @@ int Hexapod::getOppositeIntersection(int pX, int pY, float direction, int inters
 
   // choose the point whose projection onto the direction is larger
   return (projection1 > projection2) ? 0 : 1;
+}
+
+
+void Hexapod::interpolateStep(int newPositions[6][3], int prevPositions[6][3], int finalPositions[6][3], uint8_t stepHeight, uint16_t stepCounter, uint16_t stepNumber, bool moveRightLeg) {
+  /*
+   * Generates the movement pattern for one step. Largely based on linear interpolation between prevPositions and finalPositions.
+   * Three legs are also lifted (specified by moveRightLeg) and moved faster than the stationary legs. This allows them to reach their position
+   * before they lower, thus making faster motion possible.
+   *
+   * newPositions[6][3]:      Array containing the new (calculated) positions for each leg in x-y-z local coordinates.
+   * prevPositions[6][3]:     Array containing the start position in the beginning of the whole step. Used as starting point for the interpolation
+   * finalPositions[6][3]:    Array containing the previously calculated final positions for each leg. The end point for interpolation
+   * stepHeight:              Height (mm) by which the legs are being lifted
+   * stepCounter:             The number of the current iteration of the step. Must be smaller than stepNumber
+   * stepNumber:              Number of iterations in one whole step
+   * moveRightLeg:            If true, legs FL, MR, RL are being lifted. Otherwise, legs FR, ML, RR
+   *
+   */
+  // make sure stepCounter and stepNumber are valid
+  if(stepCounter > stepNumber){
+    stepCounter = stepNumber;
+  }
+  
+  // legs FL, MR, RL are lifted by default
+  int liftingLegs[3] = { 1, 2, 5 };
+  // the other legs are stationary
+  int stationaryLegs[3] = { 0, 3, 4 };
+
+  if (moveRightLeg == false) {
+    // lift legs FR, ML, RR
+    liftingLegs[0] = 0;
+    liftingLegs[1] = 3;
+    liftingLegs[2] = 4;
+
+    // the other legs are stationary
+    stationaryLegs[0] = 1;
+    stationaryLegs[1] = 2;
+    stationaryLegs[2] = 5;
+  }
+
+  // normal interpolation legs which aren't being lifted
+  for (int i = 0; i < 3; ++i) {
+    for (int j = 0; j < 3; ++j) {
+      newPositions[stationaryLegs[i]][j] = map(stepCounter, 0, stepNumber, prevPositions[stationaryLegs[i]][j], finalPositions[stationaryLegs[i]][j]);
+    }
+  }
+  // the other legs are only moved in z direction (up and down) before being moved to their new position in the xy plane
+  // this results in smoother walking patterns
+  uint16_t startNumber = ceil(stepNumber * 0.2);  // number of iterations at which the legs start to move in the xy plane
+  uint16_t targetNumber = floor(stepNumber * 0.75); // number of iterations at which the legs reach their final xy position
+  if (stepCounter >= startNumber && stepCounter <= targetNumber) {
+    // z coordinate is calculated seperatly
+    for (int i = 0; i < 3; ++i) {
+      for (int j = 0; j < 2; ++j) {
+        newPositions[liftingLegs[i]][j] = map(stepCounter, startNumber, targetNumber, prevPositions[liftingLegs[i]][j], finalPositions[liftingLegs[i]][j]);
+      }
+    }
+  }
+
+  // raise and lower the legs based on stepCounter. Only z coordinate is changed
+  uint16_t upSteps = ceil(stepNumber * 0.15);     // legs are lifted in the first 15% of the step
+  uint16_t downSteps = floor(stepNumber * 0.85);  // legs are lowered in the last 15% og the step
+  if (stepCounter < upSteps) {
+    //lifts legs
+    for (int i = 0; i < 3; ++i) {
+      newPositions[liftingLegs[i]][2] = map(stepCounter, 0, upSteps, prevPositions[liftingLegs[i]][2], finalPositions[liftingLegs[i]][2] - stepHeight);
+    }
+  } else if (stepCounter > downSteps) {
+    // lower legs
+    for (int i = 0; i < 3; ++i) {
+      newPositions[liftingLegs[i]][2] = map(stepCounter, downSteps, stepNumber, prevPositions[liftingLegs[i]][2] - stepHeight, finalPositions[liftingLegs[i]][2]);
+    }
+  } else {
+    // keep the legs lifted
+    for (int i = 0; i < 3; ++i) {
+      newPositions[liftingLegs[i]][2] = prevPositions[liftingLegs[i]][2] - stepHeight;
+    }
+  }
 }

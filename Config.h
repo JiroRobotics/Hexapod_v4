@@ -64,7 +64,7 @@ const int8_t tibiaOffsetMR = 8;
 
 const int8_t coxaOffsetML = -10;
 const int8_t femurOffsetML = -5;
-const int8_t tibiaOffsetML = 8;
+const int8_t tibiaOffsetML = 4;
 
 const int8_t coxaOffsetRR = -5;
 const int8_t femurOffsetRR = -5;
@@ -87,6 +87,6 @@ const uint8_t homePos[3] = {0, 73, 80};
 //const uint8_t homePos[3] = {0, 68, 88};
 
 // the loop is executed every [periodMs] milliseconds
-const uint16_t periodMs = 20;
+const uint16_t periodMs = 10;
 
 #endif /* Config_H */

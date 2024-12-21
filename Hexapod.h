@@ -49,6 +49,7 @@ private:
   // 3 = step with radius
   // 5 = new CrabWalk
   uint8_t action = 0;
+  uint8_t prevAction = 0;
 
   // z-coordinate of the robots center of mass (equivalent to the height of the coxa joints if rotation is zero)
   uint8_t zHeight = 80;
@@ -77,6 +78,7 @@ private:
 
   int getOppositeIntersection(int pX, int pY, float direction, int intersections[2][2]);
     
+  void interpolateStep(int newPositions[6][3], int prevPositions[6][3], int finalPositions[6][3], uint8_t stepHeight, uint16_t stepCounter, uint16_t stepNumber, bool moveRightLeg);
 };
 
 #endif /* Hexapod_H */
