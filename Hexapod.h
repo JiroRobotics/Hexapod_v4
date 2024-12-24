@@ -12,12 +12,14 @@ public:
     : legFR(legFR), legFL(legFL), legMR(legMR), legML(legML), legRR(legRR), legRL(legRL) {}
 
   // calculates the next position for each leg and passes them to newPositions[][] array
-  void calcBodyMovement(int prevPositions[6][3], int newPositions[6][3], int16_t xTrans, int16_t yTrans, int16_t zTrans, float roll, float pitch, float yaw);
+  void calcBodyMovement(int prevPositions[6][3], int newPositions[6][3], int16_t xTrans, int16_t yTrans, int16_t zTrans, float roll, float pitch, float yaw, uint8_t legMask = 0b111111);
 
   // calculates the next position for crab movement for all legs and passes them to newPositions[][]
   bool calcCrabwalk(int prevPositions[6][3], int newPositions[6][3], uint16_t stepDist, float stepDirection, uint16_t stepNumber, uint8_t stepHeight = 20, bool useOffroad = false);
   
-  bool calcCrabwalkFlush(int prevPositions[6][3], int newPositions[6][3], float stepDirection, uint8_t radius, uint16_t stepNumber, uint8_t stepHeight = 20);
+  bool calcCrabwalkFlush(int prevPositions[6][3], int newPositions[6][3], float stepDirection, uint8_t radius, uint16_t stepNumber, float overlayRotation = 0.0, uint8_t stepHeight = 20);
+
+  bool calcRotatingStepFlush(int prevPositions[6][3], int newPositions[6][3], int16_t stepRadius, bool forward, uint8_t radius, uint16_t stepNumber, uint8_t stepHeight = 20);
 
   // calculates the next position for rotating on the spot and passes them to newPositions[][]
   bool calcRotatingStep(int prevPositions[6][3], int newPositions[6][3], float stepAngle, uint16_t stepNumber, uint8_t stepHeight = 20);
@@ -78,7 +80,7 @@ private:
 
   int getOppositeIntersection(int pX, int pY, float direction, int intersections[2][2]);
     
-  void interpolateStep(int newPositions[6][3], int prevPositions[6][3], int finalPositions[6][3], uint8_t stepHeight, uint16_t stepCounter, uint16_t stepNumber, bool moveRightLeg);
+  void interpolateStep(int newPositions[6][3], int prevPositions[6][3], int finalPositions[6][3], uint8_t stepHeight, uint16_t stepCounter, uint16_t stepNumber, bool moveRightLeg, bool moveAllLegs = true);
 };
 
 #endif /* Hexapod_H */

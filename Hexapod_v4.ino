@@ -101,7 +101,7 @@ void loop() {
   }
 
   // do a couple steps in different directions
-  if (counter < 5) {
+  /*if (counter < 5) {
     myHexapod.calcCrabwalkFlush(legPositions, currPositions, PI / 4, 30, 120);
   } else if (counter < 15) {
     myHexapod.calcCrabwalkFlush(legPositions, currPositions, 0, 30, 120);
@@ -109,6 +109,15 @@ void loop() {
     myHexapod.calcCrabwalkFlush(legPositions, currPositions, PI, 30, 120);
   } else {
     myHexapod.calcCrabwalkFlush(legPositions, currPositions, 3*PI/4, 30, 120);
+  }*/
+  if (counter < 5) {
+    myHexapod.calcCrabwalkFlush(legPositions, currPositions, 0, 10, 120, 0.2, 20);
+  } else if (counter < 15) {
+    myHexapod.calcCrabwalkFlush(legPositions, currPositions, 0, 5, 120, -0.2, 20);
+  } else if (counter < 20) {
+    myHexapod.calcCrabwalkFlush(legPositions, currPositions, PI, 4, 120, 0.2, 20);
+  } else {
+    myHexapod.calcCrabwalkFlush(legPositions, currPositions, PI, 3, 120, -0.2, 20);
   }
 
   // Adjust the body position each loop() iteration
@@ -129,14 +138,14 @@ void loop() {
   }
 
   // Make sure that the arduino is fast enough to calculate everything in periodMS time span
-  //unsigned long millisCalc = millis();
-  //Serial.print("Time calculated: ");
-  //Serial.println(millisCalc-timeMillis);
+  unsigned long millisCalc = millis();
+  Serial.print("Time calculated:");
+  Serial.println(millisCalc-timeMillis);
   while (millis() < timeMillis + periodMs) {
     // wait a bit so that the loop is executet every 20ms
   }
-  //Serial.print("Time waited: ");
-  //Serial.println(millis()-millisCalc);
+  Serial.print("Time waited:");
+  Serial.println(millis()-millisCalc);
 
 
   // Reload the WDTs RR[0] reload register

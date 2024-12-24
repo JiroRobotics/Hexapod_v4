@@ -17,7 +17,7 @@ bool Hexapod::moveHome() {
   }
 }
 
-void Hexapod::calcBodyMovement(int prevPositions[6][3], int newPositions[6][3], int16_t xTrans, int16_t yTrans, int16_t zTrans, float roll, float pitch, float yaw) {
+void Hexapod::calcBodyMovement(int prevPositions[6][3], int newPositions[6][3], int16_t xTrans, int16_t yTrans, int16_t zTrans, float roll, float pitch, float yaw, uint8_t legMask) {
   /*
    * calculates the next position for each leg in local x-y-z coordinates to achieve the specified translation and rotation
    * prevPositions: 6x3 array to get the leg position without translation and rotation
@@ -28,6 +28,7 @@ void Hexapod::calcBodyMovement(int prevPositions[6][3], int newPositions[6][3], 
    * roll:          angle (in rad) to rotate around the x-axis
    * pitch:         angle (in rad) to rotate around the y-axis
    * yaw:           angle (in rad) to rotate around the z-axis
+   * moveMask:      specifies which legs are moved. By default, all legs are moved (0b111111) 
    *
    * returns:     nothing
    *
@@ -53,226 +54,237 @@ void Hexapod::calcBodyMovement(int prevPositions[6][3], int newPositions[6][3], 
   // ++++++++++++++++++++++++++++++
   // leg mid right
   // ++++++++++++++++++++++++++++++
-  // transformation from local to global coordinate system:
-  newPositions[2][1] += centerLegYDist;
-  // translation of leg end point
-  newPositions[2][0] -= xTrans;
-  newPositions[2][1] -= yTrans;
-  newPositions[2][2] += zTrans;
+  if (legMask & 0b001000) {  // leg MR corresponds to the third bit of the bitmask (counting from MSB to LSB)
+    // transformation from local to global coordinate system:
+    newPositions[2][1] += centerLegYDist;
+    // translation of leg end point
+    newPositions[2][0] -= xTrans;
+    newPositions[2][1] -= yTrans;
+    newPositions[2][2] += zTrans;
 
-  // rotating the end point using RotMatrix
-  for (int i = 0; i < 3; ++i) {
-    result[i] = 0.0;  //set the result array to 0
-  }
-
-  for (int i = 0; i < 3; ++i) {
-    for (int j = 0; j < 3; ++j) {
-      result[i] += (rotMatrix[i][j] * newPositions[2][j]);  // matrix-vector-multiplication: rotMatrix * (x, y, z)
+    // rotating the end point using RotMatrix
+    for (int i = 0; i < 3; ++i) {
+      result[i] = 0.0;  //set the result array to 0
     }
-  }
-  for (int i = 0; i < 3; ++i) {
-    newPositions[2][i] = result[i];
-  }
 
-  // transformation back to the local coordinate system
-  newPositions[2][1] -= centerLegYDist;
+    for (int i = 0; i < 3; ++i) {
+      for (int j = 0; j < 3; ++j) {
+        result[i] += (rotMatrix[i][j] * newPositions[2][j]);  // matrix-vector-multiplication: rotMatrix * (x, y, z)
+      }
+    }
+    for (int i = 0; i < 3; ++i) {
+      newPositions[2][i] = result[i];
+    }
 
+    // transformation back to the local coordinate system
+    newPositions[2][1] -= centerLegYDist;
+  }
 
   // ++++++++++++++++++++++++++++++
   // leg mid left
   // ++++++++++++++++++++++++++++++
-  // transformation from global to local coordinate system:
-  //shift
-  newPositions[3][1] += centerLegYDist;
-  //and rotate by 180°
-  newPositions[3][0] = -newPositions[3][0];
-  newPositions[3][1] = -newPositions[3][1];
+  if (legMask & 0b000100) {  // leg ML corresponds to the fourth bit of the bitmask
+    // transformation from global to local coordinate system:
+    //shift
+    newPositions[3][1] += centerLegYDist;
+    //and rotate by 180°
+    newPositions[3][0] = -newPositions[3][0];
+    newPositions[3][1] = -newPositions[3][1];
 
-  // translation of leg end point
-  newPositions[3][0] -= xTrans;
-  newPositions[3][1] -= yTrans;
-  newPositions[3][2] += zTrans;
+    // translation of leg end point
+    newPositions[3][0] -= xTrans;
+    newPositions[3][1] -= yTrans;
+    newPositions[3][2] += zTrans;
 
-  // rotating the end point using RotMatrix
-  for (int i = 0; i < 3; ++i) {
-    result[i] = 0.0;
-  }
-
-  for (int i = 0; i < 3; ++i) {
-    for (int j = 0; j < 3; ++j) {
-      result[i] += (rotMatrix[i][j] * newPositions[3][j]);
+    // rotating the end point using RotMatrix
+    for (int i = 0; i < 3; ++i) {
+      result[i] = 0.0;
     }
-  }
-  for (int i = 0; i < 3; ++i) {
-    newPositions[3][i] = result[i];
-  }
 
-  // transformation back to the local coordinate system
-  //rotate back by -180°
-  newPositions[3][0] = -newPositions[3][0];
-  newPositions[3][1] = -newPositions[3][1];
-  // shift back
-  newPositions[3][1] -= centerLegYDist;
+    for (int i = 0; i < 3; ++i) {
+      for (int j = 0; j < 3; ++j) {
+        result[i] += (rotMatrix[i][j] * newPositions[3][j]);
+      }
+    }
+    for (int i = 0; i < 3; ++i) {
+      newPositions[3][i] = result[i];
+    }
+
+    // transformation back to the local coordinate system
+    //rotate back by -180°
+    newPositions[3][0] = -newPositions[3][0];
+    newPositions[3][1] = -newPositions[3][1];
+    // shift back
+    newPositions[3][1] -= centerLegYDist;
+  }
 
   // ++++++++++++++++++++++++++++++
   // leg front right
   // ++++++++++++++++++++++++++++++
-  // rotate the local coordinate system by 30°
-  int temp = newPositions[0][0];
-  newPositions[0][0] = newPositions[0][0] * cos(-cornerLegAngle) - newPositions[0][1] * sin(-cornerLegAngle);
-  newPositions[0][1] = temp * sin(-cornerLegAngle) + newPositions[0][1] * cos(-cornerLegAngle);
+  if (legMask & 0b100000) {  // leg FR corresponds to the MSB bit of the bitmask
+    // rotate the local coordinate system by 30°
+    int temp = newPositions[0][0];
+    newPositions[0][0] = newPositions[0][0] * cos(-cornerLegAngle) - newPositions[0][1] * sin(-cornerLegAngle);
+    newPositions[0][1] = temp * sin(-cornerLegAngle) + newPositions[0][1] * cos(-cornerLegAngle);
 
-  //shift the local coordinate system to the center of mass
-  newPositions[0][0] += cornerLegXDistGlobal;
-  newPositions[0][1] += cornerLegYDistGlobal;
+    //shift the local coordinate system to the center of mass
+    newPositions[0][0] += cornerLegXDistGlobal;
+    newPositions[0][1] += cornerLegYDistGlobal;
 
-  // translation of leg end point
-  newPositions[0][0] -= xTrans;
-  newPositions[0][1] -= yTrans;
-  newPositions[0][2] += zTrans;
+    // translation of leg end point
+    newPositions[0][0] -= xTrans;
+    newPositions[0][1] -= yTrans;
+    newPositions[0][2] += zTrans;
 
-  // rotating the end point using RotMatrix
-  for (int i = 0; i < 3; ++i) {
-    result[i] = 0.0;
-  }
-
-  for (int i = 0; i < 3; ++i) {
-    for (int j = 0; j < 3; ++j) {
-      result[i] += (rotMatrix[i][j] * newPositions[0][j]);
+    // rotating the end point using RotMatrix
+    for (int i = 0; i < 3; ++i) {
+      result[i] = 0.0;
     }
-  }
-  for (int i = 0; i < 3; ++i) {
-    newPositions[0][i] = result[i];
-  }
 
-  //shift the local coordinate system back
-  newPositions[0][0] -= cornerLegXDistGlobal;
-  newPositions[0][1] -= cornerLegYDistGlobal;
+    for (int i = 0; i < 3; ++i) {
+      for (int j = 0; j < 3; ++j) {
+        result[i] += (rotMatrix[i][j] * newPositions[0][j]);
+      }
+    }
+    for (int i = 0; i < 3; ++i) {
+      newPositions[0][i] = result[i];
+    }
 
-  //rotate the coordinate system back by -30°
-  temp = newPositions[0][0];
-  newPositions[0][0] = newPositions[0][0] * cos(cornerLegAngle) - newPositions[0][1] * sin(cornerLegAngle);
-  newPositions[0][1] = temp * sin(cornerLegAngle) + newPositions[0][1] * cos(cornerLegAngle);
+    //shift the local coordinate system back
+    newPositions[0][0] -= cornerLegXDistGlobal;
+    newPositions[0][1] -= cornerLegYDistGlobal;
+
+    //rotate the coordinate system back by -30°
+    temp = newPositions[0][0];
+    newPositions[0][0] = newPositions[0][0] * cos(cornerLegAngle) - newPositions[0][1] * sin(cornerLegAngle);
+    newPositions[0][1] = temp * sin(cornerLegAngle) + newPositions[0][1] * cos(cornerLegAngle);
+  }
 
   // ++++++++++++++++++++++++++++++
   // leg rear right
   // ++++++++++++++++++++++++++++++
-  // rotate the local coordinate system by -30°
-  temp = newPositions[4][0];
-  newPositions[4][0] = newPositions[4][0] * cos(cornerLegAngle) - newPositions[4][1] * sin(cornerLegAngle);
-  newPositions[4][1] = temp * sin(cornerLegAngle) + newPositions[4][1] * cos(cornerLegAngle);
+  if (legMask & 0b000010) {  // leg RR corresponds to the fifth bit of the bitmask
+    // rotate the local coordinate system by -30°
+    int temp = newPositions[4][0];
+    newPositions[4][0] = newPositions[4][0] * cos(cornerLegAngle) - newPositions[4][1] * sin(cornerLegAngle);
+    newPositions[4][1] = temp * sin(cornerLegAngle) + newPositions[4][1] * cos(cornerLegAngle);
 
-  //shift the local coordinate system to the center of mass
-  newPositions[4][0] -= cornerLegXDistGlobal;
-  newPositions[4][1] += cornerLegYDistGlobal;
+    //shift the local coordinate system to the center of mass
+    newPositions[4][0] -= cornerLegXDistGlobal;
+    newPositions[4][1] += cornerLegYDistGlobal;
 
-  // translation of leg end point
-  newPositions[4][0] -= xTrans;
-  newPositions[4][1] -= yTrans;
-  newPositions[4][2] += zTrans;
+    // translation of leg end point
+    newPositions[4][0] -= xTrans;
+    newPositions[4][1] -= yTrans;
+    newPositions[4][2] += zTrans;
 
-  // rotating the end point using RotMatrix
-  for (int i = 0; i < 3; ++i) {
-    result[i] = 0.0;
-  }
-
-  for (int i = 0; i < 3; ++i) {
-    for (int j = 0; j < 3; ++j) {
-      result[i] += (rotMatrix[i][j] * newPositions[4][j]);
+    // rotating the end point using RotMatrix
+    for (int i = 0; i < 3; ++i) {
+      result[i] = 0.0;
     }
-  }
-  for (int i = 0; i < 3; ++i) {
-    newPositions[4][i] = result[i];
-  }
 
-  //shift the local coordinate system back
-  newPositions[4][0] += cornerLegXDistGlobal;
-  newPositions[4][1] -= cornerLegYDistGlobal;
+    for (int i = 0; i < 3; ++i) {
+      for (int j = 0; j < 3; ++j) {
+        result[i] += (rotMatrix[i][j] * newPositions[4][j]);
+      }
+    }
+    for (int i = 0; i < 3; ++i) {
+      newPositions[4][i] = result[i];
+    }
 
-  //rotate the coordinate system back by 30°
-  temp = newPositions[4][0];
-  newPositions[4][0] = newPositions[4][0] * cos(-cornerLegAngle) - newPositions[4][1] * sin(-cornerLegAngle);
-  newPositions[4][1] = temp * sin(-cornerLegAngle) + newPositions[4][1] * cos(-cornerLegAngle);
+    //shift the local coordinate system back
+    newPositions[4][0] += cornerLegXDistGlobal;
+    newPositions[4][1] -= cornerLegYDistGlobal;
+
+    //rotate the coordinate system back by 30°
+    temp = newPositions[4][0];
+    newPositions[4][0] = newPositions[4][0] * cos(-cornerLegAngle) - newPositions[4][1] * sin(-cornerLegAngle);
+    newPositions[4][1] = temp * sin(-cornerLegAngle) + newPositions[4][1] * cos(-cornerLegAngle);
+  }
 
   // ++++++++++++++++++++++++++++++
   // leg front left
   // ++++++++++++++++++++++++++++++
-  // rotate the local coordinate system by 180°-30°
-  temp = newPositions[1][0];
-  newPositions[1][0] = newPositions[1][0] * cos(-PI + cornerLegAngle) - newPositions[1][1] * sin(-PI + cornerLegAngle);
-  newPositions[1][1] = temp * sin(-PI + cornerLegAngle) + newPositions[1][1] * cos(-PI + cornerLegAngle);
+  if (legMask & 0b010000) {  // leg FL corresponds to the second bit of the bitmask
+    // rotate the local coordinate system by 180°-30°
+    int temp = newPositions[1][0];
+    newPositions[1][0] = newPositions[1][0] * cos(-PI + cornerLegAngle) - newPositions[1][1] * sin(-PI + cornerLegAngle);
+    newPositions[1][1] = temp * sin(-PI + cornerLegAngle) + newPositions[1][1] * cos(-PI + cornerLegAngle);
 
-  //shift the local coordinate system to the center of mass
-  newPositions[1][0] += cornerLegXDistGlobal;
-  newPositions[1][1] -= cornerLegYDistGlobal;
+    //shift the local coordinate system to the center of mass
+    newPositions[1][0] += cornerLegXDistGlobal;
+    newPositions[1][1] -= cornerLegYDistGlobal;
 
-  // translation of leg end point
-  newPositions[1][0] -= xTrans;
-  newPositions[1][1] -= yTrans;
-  newPositions[1][2] += zTrans;
+    // translation of leg end point
+    newPositions[1][0] -= xTrans;
+    newPositions[1][1] -= yTrans;
+    newPositions[1][2] += zTrans;
 
-  // rotating the end point using RotMatrix
-  for (int i = 0; i < 3; ++i) {
-    result[i] = 0.0;
-  }
-
-  for (int i = 0; i < 3; ++i) {
-    for (int j = 0; j < 3; ++j) {
-      result[i] += (rotMatrix[i][j] * newPositions[1][j]);
+    // rotating the end point using RotMatrix
+    for (int i = 0; i < 3; ++i) {
+      result[i] = 0.0;
     }
-  }
-  for (int i = 0; i < 3; ++i) {
-    newPositions[1][i] = result[i];
-  }
 
-  //shift the local coordinate system back
-  newPositions[1][0] -= cornerLegXDistGlobal;
-  newPositions[1][1] += cornerLegYDistGlobal;
+    for (int i = 0; i < 3; ++i) {
+      for (int j = 0; j < 3; ++j) {
+        result[i] += (rotMatrix[i][j] * newPositions[1][j]);
+      }
+    }
+    for (int i = 0; i < 3; ++i) {
+      newPositions[1][i] = result[i];
+    }
 
-  //rotate the coordinate system back by -180°+30°
-  temp = newPositions[1][0];
-  newPositions[1][0] = newPositions[1][0] * cos(PI - cornerLegAngle) - newPositions[1][1] * sin(PI - cornerLegAngle);
-  newPositions[1][1] = temp * sin(PI - cornerLegAngle) + newPositions[1][1] * cos(PI - cornerLegAngle);
+    //shift the local coordinate system back
+    newPositions[1][0] -= cornerLegXDistGlobal;
+    newPositions[1][1] += cornerLegYDistGlobal;
+
+    //rotate the coordinate system back by -180°+30°
+    temp = newPositions[1][0];
+    newPositions[1][0] = newPositions[1][0] * cos(PI - cornerLegAngle) - newPositions[1][1] * sin(PI - cornerLegAngle);
+    newPositions[1][1] = temp * sin(PI - cornerLegAngle) + newPositions[1][1] * cos(PI - cornerLegAngle);
+  }
 
   // ++++++++++++++++++++++++++++++
   // leg rear left
   // ++++++++++++++++++++++++++++++
-  // rotate the local coordinate system by 180°+30°
-  temp = newPositions[5][0];
-  newPositions[5][0] = newPositions[5][0] * cos(-PI - cornerLegAngle) - newPositions[5][1] * sin(-PI - cornerLegAngle);
-  newPositions[5][1] = temp * sin(-PI - cornerLegAngle) + newPositions[5][1] * cos(-PI - cornerLegAngle);
+  if (legMask & 0b000001) {  // leg FL corresponds to the LSB of the bitmask
+    // rotate the local coordinate system by 180°+30°
+    int temp = newPositions[5][0];
+    newPositions[5][0] = newPositions[5][0] * cos(-PI - cornerLegAngle) - newPositions[5][1] * sin(-PI - cornerLegAngle);
+    newPositions[5][1] = temp * sin(-PI - cornerLegAngle) + newPositions[5][1] * cos(-PI - cornerLegAngle);
 
-  //shift the local coordinate system to the center of mass
-  newPositions[5][0] -= cornerLegXDistGlobal;
-  newPositions[5][1] -= cornerLegYDistGlobal;
+    //shift the local coordinate system to the center of mass
+    newPositions[5][0] -= cornerLegXDistGlobal;
+    newPositions[5][1] -= cornerLegYDistGlobal;
 
-  // translation of leg end point
-  newPositions[5][0] -= xTrans;
-  newPositions[5][1] -= yTrans;
-  newPositions[5][2] += zTrans;
+    // translation of leg end point
+    newPositions[5][0] -= xTrans;
+    newPositions[5][1] -= yTrans;
+    newPositions[5][2] += zTrans;
 
-  // rotating the end point using RotMatrix
-  for (int i = 0; i < 3; ++i) {
-    result[i] = 0.0;
-  }
-
-  for (int i = 0; i < 3; ++i) {
-    for (int j = 0; j < 3; ++j) {
-      result[i] += (rotMatrix[i][j] * newPositions[5][j]);
+    // rotating the end point using RotMatrix
+    for (int i = 0; i < 3; ++i) {
+      result[i] = 0.0;
     }
-  }
-  for (int i = 0; i < 3; ++i) {
-    newPositions[5][i] = result[i];
-  }
 
-  //shift the local coordinate system back
-  newPositions[5][0] += cornerLegXDistGlobal;
-  newPositions[5][1] += cornerLegYDistGlobal;
+    for (int i = 0; i < 3; ++i) {
+      for (int j = 0; j < 3; ++j) {
+        result[i] += (rotMatrix[i][j] * newPositions[5][j]);
+      }
+    }
+    for (int i = 0; i < 3; ++i) {
+      newPositions[5][i] = result[i];
+    }
 
-  //rotate the coordinate system back by -180°-30°
-  temp = newPositions[5][0];
-  newPositions[5][0] = newPositions[5][0] * cos(PI + cornerLegAngle) - newPositions[5][1] * sin(PI + cornerLegAngle);
-  newPositions[5][1] = temp * sin(PI + cornerLegAngle) + newPositions[5][1] * cos(PI + cornerLegAngle);
+    //shift the local coordinate system back
+    newPositions[5][0] += cornerLegXDistGlobal;
+    newPositions[5][1] += cornerLegYDistGlobal;
+
+    //rotate the coordinate system back by -180°-30°
+    temp = newPositions[5][0];
+    newPositions[5][0] = newPositions[5][0] * cos(PI + cornerLegAngle) - newPositions[5][1] * sin(PI + cornerLegAngle);
+    newPositions[5][1] = temp * sin(PI + cornerLegAngle) + newPositions[5][1] * cos(PI + cornerLegAngle);
+  }
 }
 
 bool Hexapod::calcCrabwalk(int prevPositions[6][3], int newPositions[6][3], uint16_t stepDist, float stepDirection, uint16_t stepNumber, uint8_t stepHeight, bool useOffroad) {
@@ -590,7 +602,7 @@ bool Hexapod::calcCrabwalk(int prevPositions[6][3], int newPositions[6][3], uint
   return false;
 }
 
-bool Hexapod::calcCrabwalkFlush(int prevPositions[6][3], int newPositions[6][3], float stepDirection, uint8_t radius, uint16_t stepNumber, uint8_t stepHeight) {
+bool Hexapod::calcCrabwalkFlush(int prevPositions[6][3], int newPositions[6][3], float stepDirection, uint8_t radius, uint16_t stepNumber, float overlayRotation, uint8_t stepHeight) {
   /*
    * Second crabwalk version. Doesn't start at the default home position each step and doesn't move one set of legs back to home position.
    * One set of legs moves the robot, the other set moves to the best spot for the next step, assuming the next step is taken in the same
@@ -610,140 +622,116 @@ bool Hexapod::calcCrabwalkFlush(int prevPositions[6][3], int newPositions[6][3],
   if (stepCounter == 1) {
     action = 5;  // the robot is executing a step
     // figure out which three legs will be lifted and which legs will stay on the ground
+    // legs FR, ML, RR are lifted by default
+    uint8_t liftingLegs[3] = { 0, 3, 4 };
+    moveRightLeg = false;
+    // the other legs touch the ground
+    uint8_t stationaryLegs[3] = { 1, 2, 5 };
+    // angles at which the legs are mounted (FR at 30°, FL at 150°, MR at 0, ...)
+    const float legAngles[6] = { cornerLegAngle, cornerLegAngle * 5, 0, cornerLegAngle * 6, -cornerLegAngle, cornerLegAngle * 7 };
+    // determine whether the other set of legs should be lifted, based on the previously moved legs and the new direction
     if ((prevRightLeg == false && abs(stepDirection - prevDirection) <= PI / 2) || (prevRightLeg == true && abs(stepDirection - prevDirection) > PI / 2)) {
-      // move fr, ml, rr and lift fl, mr, rl
+      // lift legs FR, ML, RR
+      liftingLegs[0] = 1;
+      liftingLegs[1] = 2;
+      liftingLegs[2] = 5;
+
+      // the other legs are stationary
+      stationaryLegs[0] = 0;
+      stationaryLegs[1] = 3;
+      stationaryLegs[2] = 4;
+
       moveRightLeg = true;
-      int intersections[2][2] = { 0 };  // array containing the intersections of the line of the leg tip and the circle
-      //------------------------------
-      // Front Left Leg
-      //------------------------------
+    }
+
+    // calculate end positions for legs which are being lifted
+    for (uint8_t i = 0; i < 3; ++i) {
       // move the leg to the optimal position for the next step, assuming the next step is in the same direction
       // the optimal leg position for the next step lies on the circle circumference in the opposite direction of movement
-      finalPositions[1][0] = homePos[0] + radius * cos(stepDirection + cornerLegAngle * 5) * 1.0;
-      finalPositions[1][1] = homePos[1] + radius * sin(stepDirection + cornerLegAngle * 5) * 1.0;
-      //------------------------------
-      // Middle Right Leg
-      //------------------------------
-      finalPositions[2][0] = homePos[0] + radius * cos(stepDirection) * 1.0;
-      finalPositions[2][1] = homePos[1] + radius * sin(stepDirection) * 1.0;
-      //------------------------------
-      // Rear Left Leg
-      //------------------------------
-      finalPositions[5][0] = homePos[0] + radius * cos(stepDirection + cornerLegAngle * 7) * 1.0;
-      finalPositions[5][1] = homePos[1] + radius * sin(stepDirection + cornerLegAngle * 7) * 1.0;
+      // x value
+      finalPositions[liftingLegs[i]][0] = homePos[0] + radius * cos(stepDirection + legAngles[liftingLegs[i]]) * 1.0;
+      // y value
+      finalPositions[liftingLegs[i]][1] = homePos[1] + radius * sin(stepDirection + legAngles[liftingLegs[i]]) * 1.0;
+    }
 
-      //------------------------------
-      // Front Right Leg
-      //------------------------------
+    // calculate end positions for legs which are not lifted
+    for (uint8_t i = 0; i < 3; ++i) {
+      int intersections[2][2] = { 0 };  // array containing the intersections of the line of the leg tip and the circle
+
       // the leg tip moves from the current position in a straight line in the given direction. Find the intersection of this line with the circle
       // which is the furthest in this direction:
-      lineCircleIntersect(homePos[0], homePos[1], radius, prevPositions[0][0], prevPositions[0][1], stepDirection + cornerLegAngle, intersections);
-      int index = getOppositeIntersection(prevPositions[0][0], prevPositions[0][1], stepDirection + cornerLegAngle, intersections);
+      lineCircleIntersect(homePos[0], homePos[1], radius, prevPositions[stationaryLegs[i]][0], prevPositions[stationaryLegs[i]][1], stepDirection + legAngles[stationaryLegs[i]], intersections);
+      int index = getOppositeIntersection(prevPositions[stationaryLegs[i]][0], prevPositions[stationaryLegs[i]][1], stepDirection + legAngles[stationaryLegs[i]], intersections);
       // intersections[index][0] and intersections[index][1] are the final x/y leg positions (if they exist)
       if (intersections[index][0] != -1 && intersections[index][1] != -1) {
-        finalPositions[0][0] = intersections[index][0];
-        finalPositions[0][1] = intersections[index][1];
+        finalPositions[stationaryLegs[i]][0] = intersections[index][0];
+        finalPositions[stationaryLegs[i]][1] = intersections[index][1];
       } else {
         // if there is no intersection, just leave the legs where they are
-        finalPositions[0][0] = prevPositions[0][0];
-        finalPositions[0][1] = prevPositions[0][1];
-      }
-
-      //------------------------------
-      // Middle Left Leg
-      //------------------------------
-      // the same for all other legs. Only the direction needs to be transformed to the local coordinate system
-      lineCircleIntersect(homePos[0], homePos[1], radius, prevPositions[3][0], prevPositions[3][1], stepDirection + cornerLegAngle * 6, intersections);
-      index = getOppositeIntersection(prevPositions[3][0], prevPositions[3][1], stepDirection + cornerLegAngle * 6, intersections);
-      // intersections[index][0] and intersections[index][1] are the final x/y leg positions (if they exist)
-      if (intersections[index][0] != -1 && intersections[index][1] != -1) {
-        finalPositions[3][0] = intersections[index][0];
-        finalPositions[3][1] = intersections[index][1];
-      } else {
-        // if there is no intersection, just leave the legs where they are
-        finalPositions[3][0] = prevPositions[3][0];
-        finalPositions[3][1] = prevPositions[3][1];
-      }
-
-      //------------------------------
-      // Rear Right Leg
-      //------------------------------
-      lineCircleIntersect(homePos[0], homePos[1], radius, prevPositions[4][0], prevPositions[4][1], stepDirection - cornerLegAngle, intersections);
-      index = getOppositeIntersection(prevPositions[4][0], prevPositions[4][1], stepDirection - cornerLegAngle, intersections);
-      // intersections[index][0] and intersections[index][1] are the final x/y leg positions (if they exist)
-      if (intersections[index][0] != -1 && intersections[index][1] != -1) {
-        finalPositions[4][0] = intersections[index][0];
-        finalPositions[4][1] = intersections[index][1];
-      } else {
-        // if there is no intersection, just leave the legs where they are
-        finalPositions[4][0] = prevPositions[4][0];
-        finalPositions[4][1] = prevPositions[4][1];
-      }
-
-    } else {
-      // move fl, mr, rl and lift fr, ml, rr
-      moveRightLeg = false;
-      int intersections[2][2] = { 0 };
-      // again the same as previous, only for the other set of legs
-      //------------------------------
-      // Front Right Leg
-      //------------------------------
-      finalPositions[0][0] = homePos[0] + radius * cos(stepDirection + cornerLegAngle) * 1.0;
-      finalPositions[0][1] = homePos[1] + radius * sin(stepDirection + cornerLegAngle) * 1.0;
-      //------------------------------
-      // Middle Left Leg
-      //------------------------------
-      finalPositions[3][0] = homePos[0] + radius * cos(stepDirection + cornerLegAngle * 6) * 1.0;
-      finalPositions[3][1] = homePos[1] + radius * sin(stepDirection + cornerLegAngle * 6) * 1.0;
-      //------------------------------
-      // Rear Right Leg
-      //------------------------------
-      finalPositions[4][0] = homePos[0] + radius * cos(stepDirection - cornerLegAngle) * 1.0;
-      finalPositions[4][1] = homePos[1] + radius * sin(stepDirection - cornerLegAngle) * 1.0;
-      //------------------------------
-      // Front Left Leg
-      //------------------------------
-      lineCircleIntersect(homePos[0], homePos[1], radius, prevPositions[1][0], prevPositions[1][1], stepDirection + cornerLegAngle * 5, intersections);
-      int index = getOppositeIntersection(prevPositions[1][0], prevPositions[1][1], stepDirection + cornerLegAngle * 5, intersections);
-      // intersections[index][0] and intersections[index][1] are the final x/y leg positions (if they exist)
-      if (intersections[index][0] != -1 && intersections[index][1] != -1) {
-        finalPositions[1][0] = intersections[index][0];
-        finalPositions[1][1] = intersections[index][1];
-      } else {
-        // if there is no intersection, just leave the legs where they are
-        finalPositions[1][0] = prevPositions[1][0];
-        finalPositions[1][1] = prevPositions[1][1];
-      }
-      //------------------------------
-      // Middle Right Leg
-      //------------------------------
-      lineCircleIntersect(homePos[0], homePos[1], radius, prevPositions[2][0], prevPositions[2][1], stepDirection, intersections);
-      index = getOppositeIntersection(prevPositions[2][0], prevPositions[2][1], stepDirection, intersections);
-      // intersections[index][0] and intersections[index][1] are the final x/y leg positions (if they exist)
-      if (intersections[index][0] != -1 && intersections[index][1] != -1) {
-        finalPositions[2][0] = intersections[index][0];
-        finalPositions[2][1] = intersections[index][1];
-      } else {
-        // if there is no intersection, just leave the legs where they are
-        finalPositions[2][0] = prevPositions[2][0];
-        finalPositions[2][1] = prevPositions[2][1];
-      }
-      //------------------------------
-      // Rear Left Leg
-      //------------------------------
-      lineCircleIntersect(homePos[0], homePos[1], radius, prevPositions[5][0], prevPositions[5][1], stepDirection + cornerLegAngle * 7, intersections);
-      index = getOppositeIntersection(prevPositions[5][0], prevPositions[5][1], stepDirection + cornerLegAngle * 7, intersections);
-      // intersections[index][0] and intersections[index][1] are the final x/y leg positions (if they exist)
-      if (intersections[index][0] != -1 && intersections[index][1] != -1) {
-        finalPositions[5][0] = intersections[index][0];
-        finalPositions[5][1] = intersections[index][1];
-      } else {
-        // if there is no intersection, just leave the legs where they are
-        finalPositions[5][0] = prevPositions[5][0];
-        finalPositions[5][1] = prevPositions[5][1];
+        finalPositions[stationaryLegs[i]][0] = prevPositions[0][0];
+        finalPositions[stationaryLegs[i]][1] = prevPositions[0][1];
       }
     }
+
+    // The below code is necessary to let all legs start from random positions inside the circle
+    // If the step lengths aren't equal across all 3 legs, the shortest step length is picked and finalPositions of the two other legs is adjusted
+    // assert that all step lengths are equal
+    uint16_t stepLengths[3] = { 0 };
+    uint16_t avgLength = 0;
+    for (uint8_t i = 0; i < 3; ++i) {
+      // calculate the step lengths
+      stepLengths[i] = (prevPositions[stationaryLegs[i]][0] - finalPositions[stationaryLegs[i]][0]) * (prevPositions[stationaryLegs[i]][0] - finalPositions[stationaryLegs[i]][0]) + (prevPositions[stationaryLegs[i]][1] - finalPositions[stationaryLegs[i]][1]) * (prevPositions[stationaryLegs[i]][1] - finalPositions[stationaryLegs[i]][1]);
+      avgLength += stepLengths[i];
+    }
+
+    // check whether all distances are approximatly equal
+    avgLength /= 3;
+
+    // get the shortest distance
+    uint16_t minLength = stepLengths[0];
+    for (uint8_t i = 1; i < 3; ++i) {
+      if (stepLengths[i] < minLength) {
+        minLength = stepLengths[i];
+      }
+    }
+
+    // Check whether one leg moves a significantly shorter distance
+    const float tolerance = 0.1;  // 10%
+    bool adjustSteps = false;
+    for (uint8_t i = 0; i < 3; ++i) {
+      if (abs(stepLengths[i] - avgLength) > avgLength * tolerance) {
+        adjustSteps = true;
+        break;
+      }
+    }
+
+    if (adjustSteps == true) {
+      // Adjust finalPositions, based on the shortest step length
+      for (uint8_t i = 0; i < 3; ++i) {
+        // get directional vector
+        float dx = finalPositions[stationaryLegs[i]][0] - prevPositions[stationaryLegs[i]][0];
+        float dy = finalPositions[stationaryLegs[i]][1] - prevPositions[stationaryLegs[i]][1];
+
+        // scale factor based on minLength
+        float scale = sqrt((float)minLength / (dx * dx + dy * dy));
+
+        // calc new final positions based on minLength
+        finalPositions[stationaryLegs[i]][0] = prevPositions[stationaryLegs[i]][0] + dx * scale;
+        finalPositions[stationaryLegs[i]][1] = prevPositions[stationaryLegs[i]][1] + dy * scale;
+      }
+    }
+
+    // the following allows for rotation to be added to the movement.
+    //This isn't calculated to be inside of the circle anymore, therefore other precautions must be taken to avoid weird behavior / collisions
+    if ((overlayRotation > 0.02 && overlayRotation < 0.3) || (overlayRotation < -0.02  && overlayRotation > -0.3)) {  // avoid too crazy turn angles and unnecessary calculation
+      uint8_t mask = 0b100110;        // apply rotation only to the stationary legs FR, ML, RR
+      if (moveRightLeg == false) {
+        mask = 0b011001;  // change if the other set of legs (FL, MR, RL) if they are stationary
+      }
+      calcBodyMovement(finalPositions, finalPositions, 0, 0, 0, 0.0, 0.0, overlayRotation, mask);
+    }
   }
+
 
   // actually move the legs to the mapped position
   if (stepCounter > 0 && stepCounter <= stepNumber) {
@@ -776,6 +764,14 @@ bool Hexapod::calcCrabwalkFlush(int prevPositions[6][3], int newPositions[6][3],
     return true;
   }
   stepCounter++;
+  return false;
+}
+
+bool Hexapod::calcRotatingStepFlush(int prevPositions[6][3], int newPositions[6][3], int16_t stepRadius, bool forward, uint8_t radius, uint16_t stepNumber, uint8_t stepHeight) {
+  /*
+   * CODE
+   *
+   */
   return false;
 }
 
@@ -1577,7 +1573,6 @@ void Hexapod::lineCircleIntersect(int mX, int mY, int radius, int pX, int pY, fl
   }
 }
 
-
 int Hexapod::getOppositeIntersection(int pX, int pY, float direction, int intersections[2][2]) {
   /*
    * Returns the intersection which lies further in the passed direction.
@@ -1604,8 +1599,7 @@ int Hexapod::getOppositeIntersection(int pX, int pY, float direction, int inters
   return (projection1 > projection2) ? 0 : 1;
 }
 
-
-void Hexapod::interpolateStep(int newPositions[6][3], int prevPositions[6][3], int finalPositions[6][3], uint8_t stepHeight, uint16_t stepCounter, uint16_t stepNumber, bool moveRightLeg) {
+void Hexapod::interpolateStep(int newPositions[6][3], int prevPositions[6][3], int finalPositions[6][3], uint8_t stepHeight, uint16_t stepCounter, uint16_t stepNumber, bool moveRightLeg, bool moveAllLegs) {
   /*
    * Generates the movement pattern for one step. Largely based on linear interpolation between prevPositions and finalPositions.
    * Three legs are also lifted (specified by moveRightLeg) and moved faster than the stationary legs. This allows them to reach their position
@@ -1618,13 +1612,15 @@ void Hexapod::interpolateStep(int newPositions[6][3], int prevPositions[6][3], i
    * stepCounter:             The number of the current iteration of the step. Must be smaller than stepNumber
    * stepNumber:              Number of iterations in one whole step
    * moveRightLeg:            If true, legs FL, MR, RL are being lifted. Otherwise, legs FR, ML, RR
+   * moveAllLegs:             If true, all six legs are being moved in a strait line. Otherwise, only the legs which are lifted are moved. 
+   *                          Necessary if the legs touching the ground don't move in a strait line.
    *
    */
   // make sure stepCounter and stepNumber are valid
-  if(stepCounter > stepNumber){
+  if (stepCounter > stepNumber) {
     stepCounter = stepNumber;
   }
-  
+
   // legs FL, MR, RL are lifted by default
   int liftingLegs[3] = { 1, 2, 5 };
   // the other legs are stationary
@@ -1643,15 +1639,18 @@ void Hexapod::interpolateStep(int newPositions[6][3], int prevPositions[6][3], i
   }
 
   // normal interpolation legs which aren't being lifted
-  for (int i = 0; i < 3; ++i) {
-    for (int j = 0; j < 3; ++j) {
-      newPositions[stationaryLegs[i]][j] = map(stepCounter, 0, stepNumber, prevPositions[stationaryLegs[i]][j], finalPositions[stationaryLegs[i]][j]);
+  // don't move these legs if moveAllLegs == false (if these legs don't follow a simple line, for example while rotating on the spot)
+  if (moveAllLegs == true) {
+    for (int i = 0; i < 3; ++i) {
+      for (int j = 0; j < 3; ++j) {
+        newPositions[stationaryLegs[i]][j] = map(stepCounter, 0, stepNumber, prevPositions[stationaryLegs[i]][j], finalPositions[stationaryLegs[i]][j]);
+      }
     }
   }
   // the other legs are only moved in z direction (up and down) before being moved to their new position in the xy plane
   // this results in smoother walking patterns
-  uint16_t startNumber = ceil(stepNumber * 0.2);  // number of iterations at which the legs start to move in the xy plane
-  uint16_t targetNumber = floor(stepNumber * 0.75); // number of iterations at which the legs reach their final xy position
+  uint16_t startNumber = ceil(stepNumber * 0.2);     // number of iterations at which the legs start to move in the xy plane
+  uint16_t targetNumber = floor(stepNumber * 0.75);  // number of iterations at which the legs reach their final xy position
   if (stepCounter >= startNumber && stepCounter <= targetNumber) {
     // z coordinate is calculated seperatly
     for (int i = 0; i < 3; ++i) {
