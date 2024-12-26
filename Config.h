@@ -6,10 +6,6 @@
 // includes all constants necessary, i.e. pin numbers, measurements, etc
 
 // measurements of the robot in mm or radians
-// y distance from the center of the robot to the coxa joint of the corner legs in local coordinates
-const float cornerLegYDist = 72.89;
-// x distance from the center of the robot to the coxa joint of the corner legs in local coordinates
-const float cornerLegXDist = 40.25;
 // y distance from the center of the robot to the coxa joint of the corner legs in global coordinates
 const float cornerLegYDistGlobal = 43.0;
 // x distance from the center of the robot to the coxa joint of the corner legs in global coordinates
@@ -18,6 +14,14 @@ const float cornerLegXDistGlobal = 71.3;
 const float centerLegYDist = 53.0;
 // angle of the corner legs relative to the middle legs
 const float cornerLegAngle = PI / 6;
+
+// array with all local coordinate system positions and orientations relative to the global coordinate system of the robot (x dist, y dist, angle)
+const float legCoords[6][3] = { { cornerLegXDistGlobal, cornerLegYDistGlobal, cornerLegAngle },          // leg FR
+                                { cornerLegXDistGlobal, -cornerLegYDistGlobal, 5 * cornerLegAngle },     // leg FL
+                                { 0, centerLegYDist, 0 },                                                // leg MR
+                                { 0, -centerLegYDist, 6 * cornerLegAngle },                              // leg ML
+                                { -cornerLegXDistGlobal, cornerLegYDistGlobal, -cornerLegAngle },        // leg RR
+                                { -cornerLegXDistGlobal, -cornerLegYDistGlobal, 7 * cornerLegAngle } };  // leg RL
 
 // Length of the three links coxa, femur and tibia
 const uint8_t coxaLength = 22;
@@ -52,7 +56,7 @@ const uint8_t tibiaPinRL = 5;
 // offsets in degrees for each motor
 const int8_t coxaOffsetFR = 1;
 const int8_t femurOffsetFR = 0;
-const int8_t tibiaOffsetFR = -7;
+const int8_t tibiaOffsetFR = 4;
 
 const int8_t coxaOffsetFL = 0;
 const int8_t femurOffsetFL = -4;
@@ -68,7 +72,7 @@ const int8_t tibiaOffsetML = 4;
 
 const int8_t coxaOffsetRR = -5;
 const int8_t femurOffsetRR = -5;
-const int8_t tibiaOffsetRR = -5;
+const int8_t tibiaOffsetRR = -4;
 
 const int8_t coxaOffsetRL = -2;
 const int8_t femurOffsetRL = 0;
@@ -83,8 +87,8 @@ const uint8_t buttonRR = 8;
 const uint8_t buttonRL = 11;
 
 // home position of every leg. x,y,z - values
-const uint8_t homePos[3] = {0, 73, 80};
-//const uint8_t homePos[3] = {0, 68, 88};
+const uint8_t homePos[3] = { 0, 73, 80 };
+//const uint8_t homePos[3] = {0, 68, 88}; // use this if you want 90° angles when at home position
 
 // the loop is executed every [periodMs] milliseconds
 const uint16_t periodMs = 10;

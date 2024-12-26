@@ -37,7 +37,7 @@ int legPositions[6][3] = { { homePos[0], homePos[1], homePos[2] },    // front r
 
 int currPositions[6][3];
 int newPositions[6][3];
-uint8_t counter = 0;
+uint16_t counter = 0;
 
 void setup() {
   // use the builtin LED on pin 13 as an OUTPUT
@@ -70,10 +70,11 @@ void setup() {
   // move all legs to their home position
   myHexapod.moveHome();
 
-  // start the IMU
+  // start the IMU (currently unused)
   if (!IMU.begin()) {
     Serial.println("IMU-Sensor couldn't be initialized!");
-    while (1);
+    while (1)
+      ;
   }
   delay(1000);
 
@@ -89,8 +90,46 @@ void loop() {
   // get the current time
   unsigned long timeMillis = millis();
 
-  // calculate the new leg position
+  // exemplary movements of the robot
+  // uncomment one of the following
+  exampleBodyMovement();
+  //exampleSteps();
 
+  // update the leg position
+  myHexapod.moveLegs(newPositions);
+
+  // increment the loopCounter to keep track of the number of loop cycles
+  loopCounter++;
+  if (loopCounter == 2500) {
+    loopCounter = 0;
+  }
+  if (loopCounter % 2) {  // turn the led on and of to show each loop iteration
+    digitalWrite(LED_GREEN, HIGH);
+  } else {
+    digitalWrite(LED_GREEN, LOW);
+  }
+
+  // Make sure that the arduino is fast enough to calculate everything in periodMS time span
+  //unsigned long millisCalc = millis();
+  //Serial.print("Time calculated:");
+  //Serial.println(millisCalc-timeMillis);
+  while (millis() < timeMillis + periodMs) {
+    // wait a bit so that the loop is executet every periodMS ms
+  }
+  //Serial.print("Time waited:");
+  //Serial.println(millis()-millisCalc);
+
+
+  // Reload the WDTs RR[0] reload register
+  // if this line isn't called at least every 2 seconds, the TIMEOUT event is called and the CPU is reset
+  // uncomment this if the watchdog is used
+  //NRF_WDT->RR[0] = WDT_RR_RR_Reload;
+}
+
+
+
+void exampleSteps() {
+  // example usage of the calcStep() method
   // keep track of the number of steps
   if (myHexapod.getAction() == 0) {
     // increase the counter each time the robot is resting
@@ -101,55 +140,90 @@ void loop() {
   }
 
   // do a couple steps in different directions
-  /*if (counter < 5) {
-    myHexapod.calcCrabwalkFlush(legPositions, currPositions, PI / 4, 30, 120);
-  } else if (counter < 15) {
-    myHexapod.calcCrabwalkFlush(legPositions, currPositions, 0, 30, 120);
-  } else if (counter < 20) {
-    myHexapod.calcCrabwalkFlush(legPositions, currPositions, PI, 30, 120);
-  } else {
-    myHexapod.calcCrabwalkFlush(legPositions, currPositions, 3*PI/4, 30, 120);
-  }*/
   if (counter < 5) {
-    myHexapod.calcCrabwalkFlush(legPositions, currPositions, 0, 10, 120, 0.2, 20);
+    myHexapod.calcStep(legPositions, currPositions, 0, 30, 120, 0.0, 20);
   } else if (counter < 15) {
-    myHexapod.calcCrabwalkFlush(legPositions, currPositions, 0, 5, 120, -0.2, 20);
+    myHexapod.calcStep(legPositions, currPositions, PI / 2, 20, 120, 0.15, 20);
   } else if (counter < 20) {
-    myHexapod.calcCrabwalkFlush(legPositions, currPositions, PI, 4, 120, 0.2, 20);
+    myHexapod.calcStep(legPositions, currPositions, 0, 20, 120, 0.15, 20);
   } else {
-    myHexapod.calcCrabwalkFlush(legPositions, currPositions, PI, 3, 120, -0.2, 20);
+    myHexapod.calcStep(legPositions, currPositions, PI, 3, 120, -0.2, 20);
   }
 
   // Adjust the body position each loop() iteration
   myHexapod.calcBodyMovement(currPositions, newPositions, 0, 0, 0, 0.0, 0.0, 0.0);
+}
 
-  // update the leg position
-  myHexapod.moveLegs(newPositions);
-  
-  // increment the loopCounter to keep track of the number of loop cycles
-  loopCounter++;
-  if (loopCounter == 2000) {
-    loopCounter = 0;
-  }
-  if (loopCounter % 2) {      // turn the led on and of to show each loop iteration
-    digitalWrite(LED_BUILTIN, HIGH);
+void exampleBodyMovement() {
+  // example usage to move the robots body
+  // Move the robots body
+  if (loopCounter < 150) {
+    int b = map(loopCounter, 0, 150, 0, 180);
+    myHexapod.calcBodyMovement(legPositions, newPositions, 0, 0, 0, 0.0, b / 1000.0, 0.0);
+
+  } else if (loopCounter < 250) {
+    myHexapod.calcBodyMovement(legPositions, newPositions, 0, 0, 0, 0.0, 0.15, 0.0);
+
+  } else if (loopCounter < 400) {
+    int b = map(loopCounter, 250, 400, 180, -180);
+    myHexapod.calcBodyMovement(legPositions, newPositions, 0, 0, 0, 0.0, b / 1000.0, 0.0);
+
+  } else if (loopCounter < 500) {
+    myHexapod.calcBodyMovement(legPositions, newPositions, 0, 0, 0, 0.0, -0.18, 0.0);
+
+  } else if (loopCounter < 650) {
+    int b = map(loopCounter, 500, 650, -180, 0);
+    myHexapod.calcBodyMovement(legPositions, newPositions, 0, 0, 0, 0.0, b / 1000.0, 0.0);
+
+  } else if (loopCounter < 800) {
+    int b = map(loopCounter, 650, 800, 0, 150);
+    myHexapod.calcBodyMovement(legPositions, newPositions, 0, 0, 0, b / 1000.0, 0.0, 0.0);
+
+  } else if (loopCounter < 950) {
+    int b = map(loopCounter, 800, 950, 150, -150);
+    myHexapod.calcBodyMovement(legPositions, newPositions, 0, 0, 0, b / 1000.0, 0.0, 0.0);
+
+  } else if (loopCounter < 1100) {
+    int b = map(loopCounter, 950, 1100, -150, 0);
+    myHexapod.calcBodyMovement(legPositions, newPositions, 0, 0, 0, b / 1000.0, 0.0, 0.0);
+
+  } else if (loopCounter < 1250) {
+    int b = map(loopCounter, 1100, 1250, 0, 20);
+    myHexapod.calcBodyMovement(legPositions, newPositions, 0, 0, b, 0.0, 0.0, 0.0);
+
+  } else if (loopCounter < 1350) {
+    myHexapod.calcBodyMovement(legPositions, newPositions, 0, 0, 20, 0.0, 0.0, 0.0);
+
+  } else if (loopCounter < 1500) {
+    int b = map(loopCounter, 1350, 1500, 20, -20);
+    myHexapod.calcBodyMovement(legPositions, newPositions, 0, 0, b, 0.0, 0.0, 0.0);
+
+  } else if (loopCounter < 1600) {
+    myHexapod.calcBodyMovement(legPositions, newPositions, 0, 0, -20, 0.0, 0.0, 0.0);
+
+  } else if (loopCounter < 1750) {
+    int b = map(loopCounter, 1600, 1750, -20, 0);
+    int c = map(loopCounter, 1600, 1750, 0, 20);
+    myHexapod.calcBodyMovement(legPositions, newPositions, c, 0, b, 0.0, 0.0, 0.0);
+
+  } else if (loopCounter < 2000) {
+    int b = round(20.0 * sin(loopCounter * 2.0 * PI / 250.0));
+    int c = round(20.0 * cos(loopCounter * 2.0 * PI / 250.0));
+    myHexapod.calcBodyMovement(legPositions, newPositions, c, b, 0, 0.0, 0.0, 0.0);
+
+  } else if (loopCounter < 2100) {
+    int c = map(loopCounter, 2000, 2100, 20, 0);
+    myHexapod.calcBodyMovement(legPositions, newPositions, c, 0, 0, 0.0, 0.0, 0.0);
+
+  } else if (loopCounter < 2250) {
+    int b = map(loopCounter, 2100, 2250, 0, 150);
+    myHexapod.calcBodyMovement(legPositions, newPositions, 0, 0, 0, b / 1000.0, b / 1000.0, 0.0);
+
+  } else if (loopCounter < 2400){
+    int b = map(loopCounter, 2250, 2400, 150, 0);
+    myHexapod.calcBodyMovement(legPositions, newPositions, 0, 0, 0, b / 1000.0, b / 1000.0, 0.0);
+
   } else {
-    digitalWrite(LED_BUILTIN, LOW);
+    myHexapod.calcBodyMovement(legPositions, newPositions, 0, 0, 0, 0.0, 0.0, 0.0);
   }
-
-  // Make sure that the arduino is fast enough to calculate everything in periodMS time span
-  unsigned long millisCalc = millis();
-  Serial.print("Time calculated:");
-  Serial.println(millisCalc-timeMillis);
-  while (millis() < timeMillis + periodMs) {
-    // wait a bit so that the loop is executet every 20ms
-  }
-  Serial.print("Time waited:");
-  Serial.println(millis()-millisCalc);
-
-
-  // Reload the WDTs RR[0] reload register
-  // if this line isn't called at least every 2 seconds, the TIMEOUT event is called and the CPU is reset
-  // uncomment this if the watchdog is used
-  //NRF_WDT->RR[0] = WDT_RR_RR_Reload;
 }

@@ -13,19 +13,9 @@ public:
 
   // calculates the next position for each leg and passes them to newPositions[][] array
   void calcBodyMovement(int prevPositions[6][3], int newPositions[6][3], int16_t xTrans, int16_t yTrans, int16_t zTrans, float roll, float pitch, float yaw, uint8_t legMask = 0b111111);
-
-  // calculates the next position for crab movement for all legs and passes them to newPositions[][]
-  bool calcCrabwalk(int prevPositions[6][3], int newPositions[6][3], uint16_t stepDist, float stepDirection, uint16_t stepNumber, uint8_t stepHeight = 20, bool useOffroad = false);
   
-  bool calcCrabwalkFlush(int prevPositions[6][3], int newPositions[6][3], float stepDirection, uint8_t radius, uint16_t stepNumber, float overlayRotation = 0.0, uint8_t stepHeight = 20);
-
-  bool calcRotatingStepFlush(int prevPositions[6][3], int newPositions[6][3], int16_t stepRadius, bool forward, uint8_t radius, uint16_t stepNumber, uint8_t stepHeight = 20);
-
-  // calculates the next position for rotating on the spot and passes them to newPositions[][]
-  bool calcRotatingStep(int prevPositions[6][3], int newPositions[6][3], float stepAngle, uint16_t stepNumber, uint8_t stepHeight = 20);
-
-  // calculates the next position for a step (forwards or backwards) with a specified turning radius
-  bool calcRadiusStep(int prevPositions[6][3], int newPositions[6][3], uint8_t stepDist, float stepAngle, bool direction, uint16_t stepNumber, uint8_t stepHeight = 20);
+  // calculates the leg end point coordinates and stores them in newPositions[][] for executing a step
+  bool calcStep(int prevPositions[6][3], int newPositions[6][3], float stepDirection, uint8_t radius, uint16_t stepNumber, float overlayRotation = 0.0, uint8_t stepHeight = 20);
 
   // method to instantly move all legs to the default (home) position. Returns true if successful
   bool moveHome();
