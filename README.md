@@ -2,7 +2,6 @@
 
 <img src="pictures/hexapod_v4_picture_2.jpg" alt="Hexapod prototype" width="600">
 
-
 ## Background
 
 Hexapods are six legged robots. They possess the ability to walk in any direction, each leg (in this case) with three joints resulting in a total of 18 degrees of freedom. In addition, their body can turn and rotate in any direction, making this type of legged robot extremely flexible. But six legs also allow for fast, statically determined walking gates, i.e. lifting three legs each step while the three other legs stay on the ground. This removes the challenge of balancing during one step. 
@@ -27,7 +26,7 @@ The six limit switches are also connected to the Arduino using six of the GPIOs.
 The code for this robot was entirely written in C++ (or rather the Arduino version of C++). The rough structure is as follows:
 * A Leg class which handles the inverse kinematics of each leg (only the movement in the local coordinate system of each leg). This class also checks whether or not a (x, y, z) point is reachable for the end point of the leg and if the leg is touching the ground.
 * A Hexapod class which is an aggregation of six leg instances. This class covers all movement patterns (such as crab walk, translation and rotation on the spot, turning, ...).
-* The main Arduino programm, which is comprised of the setup() and the loop()-part. The setup()-part is run once and covers all the initialization of the servo drivers as well as setting pin modes, starting the IMU and so on. The loop() function is coded so that it is executed every 20ms, giving the hexapod an update rate of 50Hz. This means that the leg positions are calculated and the legs are moved to their positions every 20ms or 50 times a second. Running a fixed update rate allows for more flexible movement as a step is not necessarily excecuted as a whole and other movements can be superimposed.
+* The main Arduino programm, which is comprised of the setup() and the loop()-part. The setup()-part is run once and covers all the initialization of the servo drivers as well as setting pin modes, starting the IMU and so on. The loop() function is coded so that it is executed every 10ms, giving the hexapod an update rate of 100Hz. This means that the leg positions are calculated and the legs are moved to their positions every 10ms or 100 times a second. Running a fixed update rate allows for more flexible movement as a step is not necessarily excecuted as a whole and other movements can be superimposed.
 
 (UML diagram to be added)
 
@@ -65,64 +64,64 @@ Instead of implementing constrains directly for tibiaAngle and femurAngle, we si
 
 ### The Hexapod class
 As mentioned above, the six leg classes are passed to one Hexapod class which coordinates the legs and calculates all necessary points in the (local) coordinate system for each leg. The Hexapod class contains multiple methods for moving the robot:
-* **Leg movement:** This elementary method moves all six legs to their positions as specified in the array, if they are reachable.
-* **Rotation and translation on the spot:** This method has six parameters (and two pointers to the leg position arrays). Namely three (x-, y-, z-) translation values and three (roll, pitch, yaw) rotation values. The robot center is moved to match the given parameters, while all legs remain at their current position in the global coordinate frame. For example, a translation of xTrans = 30 means that the center of mass of the robot is shifted by 30mm to the front compared to home position, while an angle of roll = 0.2 (in radians) tilts the robot by approx. 11.5° sideways.
-* **Crab walking:** Still under developement, a basic version is working but I have plans to improve it. 
-* **Future walking gate:** A basic version of this gate also exists. The robot will take a step forwards or backwards while tracing the perimeter of a circle with the specified radius.
-* **Offroad mode:** Uses the limit switches to move all legs until they touch the ground, allowing the robot to cross uneven terrain. All but the z positions of the legs is the same as in the crab walk gate.
+* **moveLegs():** This elementary method moves all six legs to their positions as specified in the array, if they are reachable.
+* **calcBodyMovement():** This method has six parameters (and two pointers to the leg position arrays). Namely three (x-, y-, z-) translation values and three (roll, pitch, yaw) rotation values. The robot center is moved to match the given parameters, while all legs remain at their current position in the global coordinate frame. For example, a translation of xTrans = 30 means that the center of mass of the robot is shifted by 30mm to the front compared to home position, while an angle of roll = 0.2 (in radians) tilts the robot by approx. 11.5° sideways. Note that this method doesn't actually move the legs but rather calculates the positions of all legs and writes them in the <code>newPositions[][]</code> array. The moveLegs() method has to be called to actually move the legs.
+* **calcStep():** Universal method which lets the robot walk. It should be called periodically as many times as specified in stepNumber. In the first iteration, the final coordinates for each leg at the end of the step are calculated. In the following iterations, the current position is interpolated between the starting position and the final position. 
+* **Offroad mode:** Still needs to be implemented. Using the end switches, the robot will detect whether its legs touch the surface and adjust the z coordinate accordingly.
 
 ### Calculating points for each leg
 Since we have one coordinate frame in the center of mass of the robot and six local coordinate frames, one in the coxa joint of each leg, we need to convert between the frames. This can be done in multiple ways, for example using rotation matrices and shifting of the planes. 
 
-To calculate the new end point of a leg in the local coordinate frame resulting from a translation along one of the axis of the coordinate frame in the center of mass, we first need to shift and rotate the local frame to match the frame in the center of mass. In the example, this is done in the first 11 lines of code. In lines 5-7 the coordinate frame (more exact only the current end point) is rotated by 30° since the corner legs are mounted at an angle. 
-In lines 10-11 the frame is shifted so that both origins coincide.
+To calculate the new end point of a leg in the local coordinate frame resulting from a translation along one of the axis of the coordinate frame in the center of mass, we first need to shift and rotate the local frame to match the frame in the center of mass. To keep the code simple, an array is used to store the relative distances and angles between the local coordinate systems of each leg and the global coordinate system this array (<code>legCoords[][]</code>) is specified in [Config.h](Config.h).
 
-Now, the desired translation and rotation can be applied. First, in lines 14-16, the end point is shifted by the desired amount to achieve the translation. Second, the point is rotated by multiplying it with rotMatrix[][], which is a complete 3x3 roll pitch yaw rotation matrix.
-At last, the local coordinate frame has to be transformed back. This time, it is first shifted back and then rotated back by 30°.
+Now, the desired translation and rotation can be applied. First, the end point is shifted by the desired amount to achieve the translation. Second, the point is rotated by multiplying it with rotMatrix[][], which is a complete 3x3 roll pitch yaw rotation matrix.
+At last, the local coordinate frame has to be transformed back, first shifting it and then rotating it.
 
 ```
-// ++++++++++++++++++++++++++++++
-// leg front right
-// ++++++++++++++++++++++++++++++
-// rotate the local coordinate system by 30°
-int temp = newPositions[0][0];
-newPositions[0][0] = newPositions[0][0] * cos(-cornerLegAngle) - newPositions[0][1] * sin(-cornerLegAngle);
-newPositions[0][1] = temp * sin(-cornerLegAngle) + newPositions[0][1] * cos(-cornerLegAngle);
+for (uint8_t k = 0; k < 6; ++k) {  // iterate over all legs
 
-//shift the local coordinate system to the center of mass
-newPositions[0][0] += cornerLegXDistGlobal;
-newPositions[0][1] += cornerLegYDistGlobal;
+    // check if the leg should move (0b100000 is FR, 0b010000 is FL, ... 0b000001 is RL)
+    if (legMask & (1 << (5 - k))) {
 
-// translation of leg end point
-newPositions[0][0] -= xTrans;
-newPositions[0][1] -= yTrans;
-newPositions[0][2] += zTrans;
+      // rotate the local coordinate system by the angle specified in legCoords[][]
+      int temp = newPositions[k][0];
+      newPositions[k][0] = newPositions[k][0] * cos(-legCoords[k][2]) - newPositions[k][1] * sin(-legCoords[k][2]);
+      newPositions[k][1] = temp * sin(-legCoords[k][2]) + newPositions[k][1] * cos(-legCoords[k][2]);
 
-// rotating the end point using RotMatrix
-for (int i = 0; i < 3; ++i) {
-  result[i] = 0.0;
-}
+      //shift the local coordinate system to the center of mass
+      newPositions[k][0] += legCoords[k][0];
+      newPositions[k][1] += legCoords[k][1];
 
-for (int i = 0; i < 3; ++i) {
-  for (int j = 0; j < 3; ++j) {
-    result[i] += (rotMatrix[i][j] * newPositions[0][j]);
+      // translation of leg end point
+      newPositions[k][0] -= xTrans;
+      newPositions[k][1] -= yTrans;
+      newPositions[k][2] += zTrans;
+
+      // rotating the end point using RotMatrix
+      float result[3] = { 0.0, 0.0, 0.0 };
+
+      for (int i = 0; i < 3; ++i) {
+        for (int j = 0; j < 3; ++j) {
+          result[i] += (rotMatrix[i][j] * newPositions[k][j]);
+        }
+      }
+      for (int i = 0; i < 3; ++i) {
+        newPositions[k][i] = result[i];
+      }
+
+      //shift the local coordinate system back
+      newPositions[k][0] -= legCoords[k][0];
+      newPositions[k][1] -= legCoords[k][1];
+
+      //rotate the coordinate system back by the mounting angle of the leg
+      temp = newPositions[k][0];
+      newPositions[k][0] = newPositions[k][0] * cos(legCoords[k][2]) - newPositions[k][1] * sin(legCoords[k][2]);
+      newPositions[k][1] = temp * sin(legCoords[k][2]) + newPositions[k][1] * cos(legCoords[k][2]);
+    }
   }
-}
-for (int i = 0; i < 3; ++i) {
-  newPositions[0][i] = result[i];
-}
-
-//shift the local coordinate system back
-newPositions[0][0] -= cornerLegXDistGlobal;
-newPositions[0][1] -= cornerLegYDistGlobal;
-
-//rotate the coordinate system back by -30°
-temp = newPositions[0][0];
-newPositions[0][0] = newPositions[0][0] * cos(cornerLegAngle) - newPositions[0][1] * sin(cornerLegAngle);
-newPositions[0][1] = temp * sin(cornerLegAngle) + newPositions[0][1] * cos(cornerLegAngle);
 ```
 
-All other legs follow the same principle, only the sign of some values and the amount by which the frames need to be shifted and rotated change.
+The code above iterates over all legs. The bitmask allows only specific legs to move. As standard, all legs are moved (<code>legMask = 0b111111</code>). The first bit (MSB) corresponds to the front right leg, the last bot (LSB) to the rear left leg.
 
 Improvements/additions would be to use quaternions for faster computation of the rotations or to just use 4x4 homogeneous matrices to first transform the coordinate frames and then calculate the translation and rotation in one step (and then transforming the frame back of course).
 
@@ -130,13 +129,24 @@ Improvements/additions would be to use quaternions for faster computation of the
 Two approaches exist to create a walking motion in any direction (aka crab walk). Both approaches lift three legs, while the other three legs move the body. For example, the front left, middle right and rear left legs are being lifted, while the front right, middle left and rear right legs push the hexapod in the desired direction. The first version is simpler, but doesn't allow for long step distances, thus resulting in a more "unnatural" motion:
 
 A "home position" is defined (in the local coordinate frame, as an (x, y, z) point), to which the three legs which were lifted return after every step. As a result, three legs are guaranteed to be at the home position in the beginning of each step. From there, new points are calculated for each of the three legs. These new points describe the final position of the legs at the end of the step. The other legs (which were previously **not** at home position) just return to home position.
-Final positions for the three legs can be calculated by simply transforming (rotating) the vector by which the hexapod moves in the local coordinate system and then subtracting the vector from the home position. This vector can be passed to the method as two parameters, namely stepDist and stepDirection. stepDist is the length of the vector by which the hexapod moves while stepDirection is the angle, in which the step is taken (simply a 2D-vector in polar coordinates). For example, stepDist = 20 and stepDirection = PI will result in a step with a length of 20mm backwards (PI (rad) = 180°).
+Final positions for the three legs can be calculated by simply transforming (rotating) the vector by which the hexapod moves in the local coordinate system and then subtracting the vector from the home position. This vector can be passed to the method as two parameters, namely stepDist and stepDirection. stepDist is the length of the vector by which the hexapod moves while stepDirection is the angle, in which the step is taken (simply a 2D-vector in polar coordinates). For example, <code>stepDist = 20</code> and <code>stepDirection = PI</code> will result in a step with a length of 20mm backwards (PI (rad) = 180°).
 While providing a simple form of movement, which is also quite flexible (all possible steps can be executed after a step, the step length and direction is known, ...), it looks pretty unnatural. In addition, the maximum step length is short with only around 40mm. To achieve longer steps with more natural movement, another approach can be taken:
 
-In this approach, a "home position" is defined also. The leg isn't actually moved to the home position, but the position is used to construct a circle, in which the leg operates at every point in time. The size of the circle will later determine the maximum step length. The difference in comparison to the previous approach is the position at which the legs are after every step (obviously, duh...). After one step **all six** legs will be on the circumference of the circle. The three legs moving the hexapod will move from their current position in the given direction, until they hit the boundary of the circle. The three legs which were returning to home position in the previous approach will now be lifted and moved in the opposite direction until they hit the boundary of the circle, thus allowing the *next* step to be of maximum length. One can simply notice, that the maximum length can only be achieved if the next step is taken in the same direction as the previous and, in the worst case, no movement is possible at all. This worst case occurs if the next step is exactly in the opposite direction as the previous step. A better behaviour will result, if in advance of actually starting the step, the maximum step length is calculated for both three-leg-groups. Let's take a look at an example: the last step was taken forward, now legs front right, middle left and rear right will be in the optimal position to take the next step forward (this being the forwardmost position of the circle). The three other legs will be at the rearmost point of their circle respectively, having just moved the robot forward. If the (spontanious) decision is taken for the robot to move backwards, it woud be desireable to calculate the step length which will result for each three-leg-group in advance. The front right, middle left and rear right legs would have a step length of zero, since they already are at the forwardmost position in their circle. The three other legs, even tough they just excecuted the step, would have the maximum step length. Thus, the decision is taken to again lift the front right, middle left and rear right legs while the other three legs move the hexapod backwards, even if this contradicts the normal walking sequence (In the actual code, the exact step length isn't calculated, but the decision is rather based solely on the previous and next direction of travel. If the next step direction doesn't lie within +/-90° of the previous direction, the same three-leg-group which just moved the robot will also excecute the next step).
+In this approach, a "home position" is defined also. The leg isn't actually moved to the home position, but the position is used to construct a circle, in which the leg operates at every point in time. The size of the circle will later determine the maximum step length. The difference in comparison to the previous approach is the position at which the legs are after every step (obviously, duh...). After one step **all six** legs will be on the circumference of the circle. The three legs moving the hexapod will move from their current position in the given direction, until they hit the boundary of the circle. The three legs which were returning to home position in the previous approach will now be lifted and moved in the opposite direction until they hit the boundary of the circle, thus allowing the *next* step to be of maximum length. One can simply notice, that the maximum length can only be achieved if the next step is taken in the same direction as the previous (or the exact opposite direction) and, in the worst case, no movement is possible at all. This worst case occurs if the next step's direction is exactly 90° from the previous step. By keeping track of the previous step direction, the pair of legs which can perform the longest step in the new direction can be determined. Therefore, the difference between the previous and the new direction is considered. If the difference is smaller than 90°, the other set of legs is moved (e.g. if in the previous step, legs front right, mid left and rear right moved the robot and the new direction is 45° larger than in the previous step, the other set of legs will now move the robot). If the difference is larger than 90°, the same set of legs which performed the previous step will also perform the next step, as they can move the longest distance.
+
+Up until now, the robot can walk in all directions, but can't rotate in any form. To fix this, a trick can be used: After all final positions for the current step are calculated, these final positions can be rotated. Using the calcBodyMovement() method along with a mask, a rotation (yaw) is applied to the three legs which move the robot. While this allows the robot to move in any direction with any rotation superimposed, it also means that the final positions are not guaranteed to be inside of the circle anymore. Therefore, other precautions must be taken to avoid unwanted behaviour.
+
+```
+if ((overlayRotation > 0.02 && overlayRotation < 0.3) || (overlayRotation < -0.02 && overlayRotation > -0.3)) {  // avoid too crazy turn angles and unnecessary calculation
+  uint8_t mask = 0b100110;                                                                                       // apply rotation only to the stationary legs FR, ML, RR
+  if (moveRightLeg == false) {
+    mask = 0b011001;  // change if the other set of legs (FL, MR, RL) if they are stationary
+  }
+  calcBodyMovement(finalPositions, finalPositions, 0, 0, 0, 0.0, 0.0, overlayRotation, mask);
+}
+```
 
 (Image to be added)
 
 ### Main loop
-As already mentioned, the loop() function is called every 20ms. At the beginning of each loop() excecution, a method of the Hexapod class (e.g. Hexapod.calcCrabwalk()) can be called which modifies an array containing (x, y, z) positions for all six legs, writing the new values. Additionally, the Hexapod.calcBodyMovement() method is called **every** loop iteration which allows for flexible superimposition of body rotation and translation ontop of the movement of the robot.
-A counter keeps track of the number of loop() calls. This counter can be used to program sequences, e.g. three steps to the left, then rotating on the spot, four steps forward, ...
+As already mentioned, the <code>loop()</code> function is called every 10ms. During each loop iteration, the legs are moved once using <code>myHexapod.moveLegs(newPositions)</code>. <code>newPositions[][]</code> can be can be calculated using either <code>myHexapod.calcStep()</code>, <code>myHexapod.calcBodyMovement()</code> or both. Example usage is provided in <code>exampleSteps()</code> and <code>exampleBodyMovement()</code>. The <code>myHexapod.getAction()</code> method can be used to check whether the robot is executing a step or resting at the moment. Additionally, a loopCounter is used to keep track of the number of times the loop has been executed. The green LED of the Arduino BLE is also toggled in every loop.
