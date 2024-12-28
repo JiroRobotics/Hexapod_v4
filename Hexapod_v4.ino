@@ -92,8 +92,8 @@ void loop() {
 
   // exemplary movements of the robot
   // uncomment one of the following
-  exampleBodyMovement();
-  //exampleSteps();
+  //exampleBodyMovement();
+  exampleSteps();
 
   // update the leg position
   myHexapod.moveLegs(newPositions);
@@ -150,13 +150,13 @@ void exampleSteps() {
     myHexapod.calcStep(legPositions, currPositions, PI, 3, 120, -0.2, 20);
   }
 
-  // Adjust the body position each loop() iteration
+  // Adjust the body position each loop() iteration. This allows for superimposition of body movement independently of the step
   myHexapod.calcBodyMovement(currPositions, newPositions, 0, 0, 0, 0.0, 0.0, 0.0);
 }
 
 void exampleBodyMovement() {
-  // example usage to move the robots body
-  // Move the robots body
+  // example usage of calcBodyMovement to move the robots body
+
   if (loopCounter < 150) {
     int b = map(loopCounter, 0, 150, 0, 180);
     myHexapod.calcBodyMovement(legPositions, newPositions, 0, 0, 0, 0.0, b / 1000.0, 0.0);

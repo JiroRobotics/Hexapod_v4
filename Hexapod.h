@@ -41,18 +41,10 @@ private:
   // 3 = step with radius
   // 5 = new CrabWalk
   uint8_t action = 0;
-  uint8_t prevAction = 0;
-
-  // z-coordinate of the robots center of mass (equivalent to the height of the coxa joints if rotation is zero)
-  uint8_t zHeight = 80;
-  // total orientation of the robots local coordinate system relative to the global coordinate system
-  float averageHeight = 0.0f;
 
   // counter to keep track of the number of iterations in calcCrabwalk()
   uint16_t stepCounter = 1;
   // indicator whether to move legs FR, ML, RR or legs FL, MR, RL
-  bool rightLegHome = true;
-  bool leftLegHome = true;
   bool moveRightLeg = true;
 
   float prevDirection = 0.0;

@@ -28,15 +28,11 @@ void Hexapod::calcBodyMovement(int prevPositions[6][3], int newPositions[6][3], 
    * roll:          angle (in rad) to rotate around the x-axis
    * pitch:         angle (in rad) to rotate around the y-axis
    * yaw:           angle (in rad) to rotate around the z-axis
-   * moveMask:      specifies which legs are moved. By default, all legs are moved (0b111111) 
+   * legMask:       specifies which legs are moved. By default, all legs are moved (0b111111) 
    *
    * returns:     nothing
-   *
-   * runtime on Arduino Nano 33 IoT: <5.65ms (default), <8.2ms (useFloat)
-   * runtime on Arduino Nano 33 BLE Sense: <3.85ms (default), <3.95ms (useFloat) (<- this is what a FPU is made for)
    */
 
-  // code...
   // copy the previous positions (without translation and rotation) in the newPositions array
   for (int i = 0; i < 6; ++i) {
     for (int j = 0; j < 3; ++j) {
@@ -48,10 +44,14 @@ void Hexapod::calcBodyMovement(int prevPositions[6][3], int newPositions[6][3], 
   const float rotMatrix[3][3] = { { cos(pitch) * cos(yaw), sin(roll) * sin(pitch) * cos(yaw) - cos(roll) * sin(yaw), cos(roll) * sin(pitch) * cos(yaw) + sin(roll) * sin(yaw) },
                                   { cos(pitch) * sin(yaw), sin(roll) * sin(pitch) * sin(yaw) + cos(roll) * cos(yaw), cos(roll) * sin(pitch) * sin(yaw) - sin(roll) * cos(yaw) },
                                   { -sin(pitch), sin(roll) * cos(pitch), cos(roll) * cos(pitch) } };
-  // array to save the rotation result temporarily
-  //float result[3] = { 0.0, 0.0, 0.0 };
 
-  // new for-loop
+  // calculating the new coordinates for each leg is done by:
+  // 1. rotating the local coordinate frame to be aligned with the global frame
+  // 2. shifting the local coordinate frame to the origin of the global frame
+  // 3. shifting the previous leg end point by xTrans, yTrans, zTrans
+  // 4. rotating the previous leg end point by roll, pitch, yaw
+  // 5. shift the local coordinate frame back
+  // 6. rotate the local coordinate frame back
   for (uint8_t k = 0; k < 6; ++k) {  // iterate over all legs
 
     // check if the leg should move (0b100000 is FR, 0b010000 is FL, ... 0b000001 is RL)
@@ -93,241 +93,6 @@ void Hexapod::calcBodyMovement(int prevPositions[6][3], int newPositions[6][3], 
       newPositions[k][1] = temp * sin(legCoords[k][2]) + newPositions[k][1] * cos(legCoords[k][2]);
     }
   }
-  /*
-  // ++++++++++++++++++++++++++++++
-  // leg mid right
-  // ++++++++++++++++++++++++++++++
-  if (legMask & 0b001000) {  // leg MR corresponds to the third bit of the bitmask (counting from MSB to LSB)
-    // transformation from local to global coordinate system:
-    newPositions[2][1] += centerLegYDist;
-    // translation of leg end point
-    newPositions[2][0] -= xTrans;
-    newPositions[2][1] -= yTrans;
-    newPositions[2][2] += zTrans;
-
-    // rotating the end point using RotMatrix
-    for (int i = 0; i < 3; ++i) {
-      result[i] = 0.0;  //set the result array to 0
-    }
-
-    for (int i = 0; i < 3; ++i) {
-      for (int j = 0; j < 3; ++j) {
-        result[i] += (rotMatrix[i][j] * newPositions[2][j]);  // matrix-vector-multiplication: rotMatrix * (x, y, z)
-      }
-    }
-    for (int i = 0; i < 3; ++i) {
-      newPositions[2][i] = result[i];
-    }
-
-    // transformation back to the local coordinate system
-    newPositions[2][1] -= centerLegYDist;
-  }
-
-  // ++++++++++++++++++++++++++++++
-  // leg mid left
-  // ++++++++++++++++++++++++++++++
-  if (legMask & 0b000100) {  // leg ML corresponds to the fourth bit of the bitmask
-    // transformation from global to local coordinate system:
-    //shift
-    newPositions[3][1] += centerLegYDist;
-    //and rotate by 180°
-    newPositions[3][0] = -newPositions[3][0];
-    newPositions[3][1] = -newPositions[3][1];
-
-    // translation of leg end point
-    newPositions[3][0] -= xTrans;
-    newPositions[3][1] -= yTrans;
-    newPositions[3][2] += zTrans;
-
-    // rotating the end point using RotMatrix
-    for (int i = 0; i < 3; ++i) {
-      result[i] = 0.0;
-    }
-
-    for (int i = 0; i < 3; ++i) {
-      for (int j = 0; j < 3; ++j) {
-        result[i] += (rotMatrix[i][j] * newPositions[3][j]);
-      }
-    }
-    for (int i = 0; i < 3; ++i) {
-      newPositions[3][i] = result[i];
-    }
-
-    // transformation back to the local coordinate system
-    //rotate back by -180°
-    newPositions[3][0] = -newPositions[3][0];
-    newPositions[3][1] = -newPositions[3][1];
-    // shift back
-    newPositions[3][1] -= centerLegYDist;
-  }
-
-  // ++++++++++++++++++++++++++++++
-  // leg front right
-  // ++++++++++++++++++++++++++++++
-  if (legMask & 0b100000) {  // leg FR corresponds to the MSB bit of the bitmask
-    // rotate the local coordinate system by 30°
-    int temp = newPositions[0][0];
-    newPositions[0][0] = newPositions[0][0] * cos(-cornerLegAngle) - newPositions[0][1] * sin(-cornerLegAngle);
-    newPositions[0][1] = temp * sin(-cornerLegAngle) + newPositions[0][1] * cos(-cornerLegAngle);
-
-    //shift the local coordinate system to the center of mass
-    newPositions[0][0] += cornerLegXDistGlobal;
-    newPositions[0][1] += cornerLegYDistGlobal;
-
-    // translation of leg end point
-    newPositions[0][0] -= xTrans;
-    newPositions[0][1] -= yTrans;
-    newPositions[0][2] += zTrans;
-
-    // rotating the end point using RotMatrix
-    for (int i = 0; i < 3; ++i) {
-      result[i] = 0.0;
-    }
-
-    for (int i = 0; i < 3; ++i) {
-      for (int j = 0; j < 3; ++j) {
-        result[i] += (rotMatrix[i][j] * newPositions[0][j]);
-      }
-    }
-    for (int i = 0; i < 3; ++i) {
-      newPositions[0][i] = result[i];
-    }
-
-    //shift the local coordinate system back
-    newPositions[0][0] -= cornerLegXDistGlobal;
-    newPositions[0][1] -= cornerLegYDistGlobal;
-
-    //rotate the coordinate system back by -30°
-    temp = newPositions[0][0];
-    newPositions[0][0] = newPositions[0][0] * cos(cornerLegAngle) - newPositions[0][1] * sin(cornerLegAngle);
-    newPositions[0][1] = temp * sin(cornerLegAngle) + newPositions[0][1] * cos(cornerLegAngle);
-  }
-
-  // ++++++++++++++++++++++++++++++
-  // leg rear right
-  // ++++++++++++++++++++++++++++++
-  if (legMask & 0b000010) {  // leg RR corresponds to the fifth bit of the bitmask
-    // rotate the local coordinate system by -30°
-    int temp = newPositions[4][0];
-    newPositions[4][0] = newPositions[4][0] * cos(cornerLegAngle) - newPositions[4][1] * sin(cornerLegAngle);
-    newPositions[4][1] = temp * sin(cornerLegAngle) + newPositions[4][1] * cos(cornerLegAngle);
-
-    //shift the local coordinate system to the center of mass
-    newPositions[4][0] -= cornerLegXDistGlobal;
-    newPositions[4][1] += cornerLegYDistGlobal;
-
-    // translation of leg end point
-    newPositions[4][0] -= xTrans;
-    newPositions[4][1] -= yTrans;
-    newPositions[4][2] += zTrans;
-
-    // rotating the end point using RotMatrix
-    for (int i = 0; i < 3; ++i) {
-      result[i] = 0.0;
-    }
-
-    for (int i = 0; i < 3; ++i) {
-      for (int j = 0; j < 3; ++j) {
-        result[i] += (rotMatrix[i][j] * newPositions[4][j]);
-      }
-    }
-    for (int i = 0; i < 3; ++i) {
-      newPositions[4][i] = result[i];
-    }
-
-    //shift the local coordinate system back
-    newPositions[4][0] += cornerLegXDistGlobal;
-    newPositions[4][1] -= cornerLegYDistGlobal;
-
-    //rotate the coordinate system back by 30°
-    temp = newPositions[4][0];
-    newPositions[4][0] = newPositions[4][0] * cos(-cornerLegAngle) - newPositions[4][1] * sin(-cornerLegAngle);
-    newPositions[4][1] = temp * sin(-cornerLegAngle) + newPositions[4][1] * cos(-cornerLegAngle);
-  }
-
-  // ++++++++++++++++++++++++++++++
-  // leg front left
-  // ++++++++++++++++++++++++++++++
-  if (legMask & 0b010000) {  // leg FL corresponds to the second bit of the bitmask
-    // rotate the local coordinate system by 180°-30°
-    int temp = newPositions[1][0];
-    newPositions[1][0] = newPositions[1][0] * cos(-PI + cornerLegAngle) - newPositions[1][1] * sin(-PI + cornerLegAngle);
-    newPositions[1][1] = temp * sin(-PI + cornerLegAngle) + newPositions[1][1] * cos(-PI + cornerLegAngle);
-
-    //shift the local coordinate system to the center of mass
-    newPositions[1][0] += cornerLegXDistGlobal;
-    newPositions[1][1] -= cornerLegYDistGlobal;
-
-    // translation of leg end point
-    newPositions[1][0] -= xTrans;
-    newPositions[1][1] -= yTrans;
-    newPositions[1][2] += zTrans;
-
-    // rotating the end point using RotMatrix
-    for (int i = 0; i < 3; ++i) {
-      result[i] = 0.0;
-    }
-
-    for (int i = 0; i < 3; ++i) {
-      for (int j = 0; j < 3; ++j) {
-        result[i] += (rotMatrix[i][j] * newPositions[1][j]);
-      }
-    }
-    for (int i = 0; i < 3; ++i) {
-      newPositions[1][i] = result[i];
-    }
-
-    //shift the local coordinate system back
-    newPositions[1][0] -= cornerLegXDistGlobal;
-    newPositions[1][1] += cornerLegYDistGlobal;
-
-    //rotate the coordinate system back by -180°+30°
-    temp = newPositions[1][0];
-    newPositions[1][0] = newPositions[1][0] * cos(PI - cornerLegAngle) - newPositions[1][1] * sin(PI - cornerLegAngle);
-    newPositions[1][1] = temp * sin(PI - cornerLegAngle) + newPositions[1][1] * cos(PI - cornerLegAngle);
-  }
-
-  // ++++++++++++++++++++++++++++++
-  // leg rear left
-  // ++++++++++++++++++++++++++++++
-  if (legMask & 0b000001) {  // leg FL corresponds to the LSB of the bitmask
-    // rotate the local coordinate system by 180°+30°
-    int temp = newPositions[5][0];
-    newPositions[5][0] = newPositions[5][0] * cos(-PI - cornerLegAngle) - newPositions[5][1] * sin(-PI - cornerLegAngle);
-    newPositions[5][1] = temp * sin(-PI - cornerLegAngle) + newPositions[5][1] * cos(-PI - cornerLegAngle);
-
-    //shift the local coordinate system to the center of mass
-    newPositions[5][0] -= cornerLegXDistGlobal;
-    newPositions[5][1] -= cornerLegYDistGlobal;
-
-    // translation of leg end point
-    newPositions[5][0] -= xTrans;
-    newPositions[5][1] -= yTrans;
-    newPositions[5][2] += zTrans;
-
-    // rotating the end point using RotMatrix
-    for (int i = 0; i < 3; ++i) {
-      result[i] = 0.0;
-    }
-
-    for (int i = 0; i < 3; ++i) {
-      for (int j = 0; j < 3; ++j) {
-        result[i] += (rotMatrix[i][j] * newPositions[5][j]);
-      }
-    }
-    for (int i = 0; i < 3; ++i) {
-      newPositions[5][i] = result[i];
-    }
-
-    //shift the local coordinate system back
-    newPositions[5][0] += cornerLegXDistGlobal;
-    newPositions[5][1] += cornerLegYDistGlobal;
-
-    //rotate the coordinate system back by -180°-30°
-    temp = newPositions[5][0];
-    newPositions[5][0] = newPositions[5][0] * cos(PI + cornerLegAngle) - newPositions[5][1] * sin(PI + cornerLegAngle);
-    newPositions[5][1] = temp * sin(PI + cornerLegAngle) + newPositions[5][1] * cos(PI + cornerLegAngle);
-  }*/
 }
 
 bool Hexapod::calcStep(int prevPositions[6][3], int newPositions[6][3], float stepDirection, uint8_t radius, uint16_t stepNumber, float overlayRotation, uint8_t stepHeight) {
@@ -491,7 +256,6 @@ bool Hexapod::calcStep(int prevPositions[6][3], int newPositions[6][3], float st
     stepCounter = 1;
     // set action to 0, as the hexapod is now sleeping / doing nothing
     action = 0;
-    prevAction = 5;
     return true;
   }
   stepCounter++;
