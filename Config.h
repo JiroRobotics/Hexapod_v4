@@ -91,7 +91,8 @@ const float homePos[3] = { 0.0, 73.0, 80.0 };
 //const float homePos[3] = {0.0, 68.0, 88.0}; // use this if you want 90° angles when at home position
 
 // the loop is executed every [periodMs] milliseconds
-const uint16_t periodMs = 10;
+const uint16_t periodMs = 10; // recommended for Arduino Nano 33 BLE Sense
+//const uint16_t periodMS = 15; // recommended for Arduino Nano 33 IoT
 
 const uint8_t pwm1Addr = 0x40;
 const uint8_t pwm2Addr = 0x41;
