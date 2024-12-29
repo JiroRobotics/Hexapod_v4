@@ -87,10 +87,13 @@ const uint8_t buttonRR = 8;
 const uint8_t buttonRL = 11;
 
 // home position of every leg. x,y,z - values
-const uint8_t homePos[3] = { 0, 73, 80 };
-//const uint8_t homePos[3] = {0, 68, 88}; // use this if you want 90° angles when at home position
+const float homePos[3] = { 0.0, 73.0, 80.0 };
+//const float homePos[3] = {0.0, 68.0, 88.0}; // use this if you want 90° angles when at home position
 
 // the loop is executed every [periodMs] milliseconds
 const uint16_t periodMs = 10;
+
+const uint8_t pwm1Addr = 0x40;
+const uint8_t pwm2Addr = 0x41;
 
 #endif /* Config_H */

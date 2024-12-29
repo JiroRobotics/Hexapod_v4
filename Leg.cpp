@@ -1,8 +1,8 @@
 // Leg.cpp
 
 #include "Leg.h"
-// uncomment the following line to use higher precision. Doesn't bring any visual improvement
-//#define useFloat
+// uncomment the following line to use higher precision.
+#define useFloat
 
 void Leg::setAngle(uint8_t servoPin, int offset, int angleVal) {
   /*
@@ -15,13 +15,13 @@ void Leg::setAngle(uint8_t servoPin, int offset, int angleVal) {
   servoDriver.setPWM(servoPin, 0, angle(angleVal + offset));
 }
 
-bool Leg::moveTo(int xValue, int yValue, int zValue) {
+bool Leg::moveTo(float xValue, float yValue, float zValue) {
   /*
    * moves the leg to the given x y z coordinates (in local coordinate system)
    *
-   * int xValue:    the x-value (left/right) in mm to move the legpoint to
-   * int yValue:    the y-value (back/forth) in mm to move the legpoint to
-   * int zValue:    the z-value (height) in mm to move the legpoint to
+   * xValue:    the x-value (left/right) in mm to move the legpoint to
+   * yValue:    the y-value (back/forth) in mm to move the legpoint to
+   * zValue:    the z-value (height) in mm to move the legpoint to
    *
    * returns:       true if the leg reached the point, false if the point is unreachable
    */
@@ -61,18 +61,6 @@ bool Leg::moveTo(int xValue, int yValue, int zValue) {
     flag = false;
   }
 
-  // checks the same for femur and tibia servos
-  // not necessary as we have isReachable()
-  /*if (L <= (femurLength + tibiaLength - 5)) {
-    if (alpha + offsetTibia <= 134) {
-      servoDriver.setPWM(pinFemur, 0, angleFloat(alpha + offsetFemur));
-    } else {
-      flag = false;
-    }
-    servoDriver.setPWM(pinTibia, 0, angleFloat(beta + offsetTibia));
-  } else {
-    flag = false;
-  }*/
   servoDriver.setPWM(pinFemur, 0, angleFloat(alpha + offsetFemur));
   servoDriver.setPWM(pinTibia, 0, angleFloat(beta + offsetTibia));
 #else
@@ -97,18 +85,6 @@ bool Leg::moveTo(int xValue, int yValue, int zValue) {
     flag = false;
   }
 
-  // checks the same for femur and tibia servos
-  // not necessary as we have isReachable()
-  /*if (L <= (femurLength + tibiaLength - 5)) {
-    if (alpha + offsetTibia <= 134) {
-      servoDriver.setPWM(pinFemur, 0, angle(alpha + offsetFemur));
-    } else {
-      flag = false;
-    }
-    servoDriver.setPWM(pinTibia, 0, angle(beta + offsetTibia));
-  } else {
-    flag = false;
-  }*/
   servoDriver.setPWM(pinFemur, 0, angle(alpha + offsetFemur));
   servoDriver.setPWM(pinTibia, 0, angle(beta + offsetTibia));
 #endif
@@ -122,17 +98,17 @@ bool Leg::moveTo(int xValue, int yValue, int zValue) {
   return flag;
 }
 
-[[nodiscard]] int Leg::getXVal() {
+[[nodiscard]] float Leg::getXVal() {
   // returns the last x-Value in local coordinates
   return currPos[0];
 }
 
-[[nodiscard]] int Leg::getYVal() {
+[[nodiscard]] float Leg::getYVal() {
   // returns the last y-Value in local coordinates
   return currPos[1];
 }
 
-[[nodiscard]] int Leg::getZVal() {
+[[nodiscard]] float Leg::getZVal() {
   // returns the last y-Value in local coordinates
   return currPos[2];
 }
@@ -180,7 +156,7 @@ float Leg::mapFloat(float x, float in_min, float in_max, float out_min, float ou
   return digitalRead(pinPushButton);
 }
 
-inline bool Leg::isReachable(float L, int z) {
+inline bool Leg::isReachable(float L, float z) {
   /*
    * checks whether the point specified by L (horizontal distance from local coordinate frame to end point) 
    * and z (vertical distance from local coordinate frame to end point) is reachable.

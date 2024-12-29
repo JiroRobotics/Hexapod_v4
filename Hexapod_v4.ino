@@ -2,14 +2,16 @@
 // Hardware is largely the same as v3. Currently uses a Nano 33 BLE Sense Rev 2, but will also work on other capable
 // Arduinos like the Nano 33 IoT
 
+//#define DEBUG
+
 #include <Arduino_BMI270_BMM150.h>
 #include <Adafruit_PWMServoDriver.h>
 #include "Config.h"
 #include "Hexapod.h"
 #include "Leg.h"
 
-Adafruit_PWMServoDriver pwm1 = Adafruit_PWMServoDriver(0x40);
-Adafruit_PWMServoDriver pwm2 = Adafruit_PWMServoDriver(0x41);
+Adafruit_PWMServoDriver pwm1 = Adafruit_PWMServoDriver(pwm1Addr);
+Adafruit_PWMServoDriver pwm2 = Adafruit_PWMServoDriver(pwm2Addr);
 
 // initialize all six legs of the robot using config.h
 Leg legFrontRight = Leg(pwm2, coxaPinFR, femurPinFR, tibiaPinFR, coxaOffsetFR, femurOffsetFR, tibiaOffsetFR, true, buttonFR);
@@ -19,37 +21,38 @@ Leg legMidLeft = Leg(pwm1, coxaPinML, femurPinML, tibiaPinML, coxaOffsetML, femu
 Leg legRearRight = Leg(pwm2, coxaPinRR, femurPinRR, tibiaPinRR, coxaOffsetRR, femurOffsetRR, tibiaOffsetRR, true, buttonRR);
 Leg legRearLeft = Leg(pwm1, coxaPinRL, femurPinRL, tibiaPinRL, coxaOffsetRL, femurOffsetRL, tibiaOffsetRL, false, buttonRL);
 
-// an array of pointers pointing to the six legs
-Leg* legs[6] = { &legFrontRight, &legFrontLeft, &legMidRight, &legMidLeft, &legRearRight, &legRearLeft };
-
 // Initialization of hexapod object
 Hexapod myHexapod = Hexapod(legFrontRight, legFrontLeft, legMidRight, legMidLeft, legRearRight, legRearLeft);
 unsigned long loopCounter = 0;
 
 // array which stores the positions of each leg in x-y-z local coordinates
 // used to pass the calculated new positions to the .movelegs() methode
-int legPositions[6][3] = { { homePos[0], homePos[1], homePos[2] },    // front right
-                           { homePos[0], homePos[1], homePos[2] },    // front left
-                           { homePos[0], homePos[1], homePos[2] },    // mid right
-                           { homePos[0], homePos[1], homePos[2] },    // mid left
-                           { homePos[0], homePos[1], homePos[2] },    // rear right
-                           { homePos[0], homePos[1], homePos[2] } };  // rear left
+float legPositions[6][3] = { { homePos[0], homePos[1], homePos[2] },    // front right
+                             { homePos[0], homePos[1], homePos[2] },    // front left
+                             { homePos[0], homePos[1], homePos[2] },    // mid right
+                             { homePos[0], homePos[1], homePos[2] },    // mid left
+                             { homePos[0], homePos[1], homePos[2] },    // rear right
+                             { homePos[0], homePos[1], homePos[2] } };  // rear left
 
-int currPositions[6][3];
-int newPositions[6][3];
+float currPositions[6][3];
+float newPositions[6][3];
 uint16_t counter = 0;
 
 void setup() {
-  // use the builtin LED on pin 13 as an OUTPUT
-  pinMode(LED_BUILTIN, OUTPUT);
+
+#ifdef ARDUINO_ARDUINO_NANO33BLE
   pinMode(LED_RED, OUTPUT);
   pinMode(LED_BLUE, OUTPUT);
   pinMode(LED_GREEN, OUTPUT);
-  digitalWrite(LED_BUILTIN, LOW);
+
   // Built in RGB is inverted
   digitalWrite(LED_RED, HIGH);
   digitalWrite(LED_BLUE, HIGH);
   digitalWrite(LED_GREEN, HIGH);
+#endif
+  // use the builtin LED on pin 13 as an OUTPUT
+  pinMode(LED_BUILTIN, OUTPUT);
+  digitalWrite(LED_BUILTIN, LOW);
   // use all the push buttons on the legs as INPUT
   pinMode(buttonFR, INPUT);
   pinMode(buttonFL, INPUT);
@@ -58,8 +61,10 @@ void setup() {
   pinMode(buttonRR, INPUT);
   pinMode(buttonRL, INPUT);
 
+#ifdef DEBUG
   // used for debug
   Serial.begin(9600);
+#endif
 
   // start pwm on the servo drivers with 50Hz frequency
   pwm1.begin();
@@ -73,8 +78,7 @@ void setup() {
   // start the IMU (currently unused)
   if (!IMU.begin()) {
     Serial.println("IMU-Sensor couldn't be initialized!");
-    while (1)
-      ;
+    while (1) {}
   }
   delay(1000);
 
@@ -103,29 +107,42 @@ void loop() {
   if (loopCounter == 2500) {
     loopCounter = 0;
   }
+
+#ifdef ARDUINO_ARDUINO_NANO33BLE
   if (loopCounter % 2) {  // turn the led on and of to show each loop iteration
     digitalWrite(LED_GREEN, HIGH);
   } else {
     digitalWrite(LED_GREEN, LOW);
   }
+#else
+  if (loopCounter % 2) {  // turn the led on and of to show each loop iteration
+    digitalWrite(LED_BUILTIN, HIGH);
+  } else {
+    digitalWrite(LED_BUILTIN, LOW);
+  }
+#endif
 
+#ifdef DEBUG
   // Make sure that the arduino is fast enough to calculate everything in periodMS time span
-  //unsigned long millisCalc = millis();
-  //Serial.print("Time calculated:");
-  //Serial.println(millisCalc-timeMillis);
+  unsigned long millisCalc = millis();
+  Serial.print("Time calculated:");
+  Serial.println(millisCalc - timeMillis);
   while (millis() < timeMillis + periodMs) {
     // wait a bit so that the loop is executet every periodMS ms
   }
-  //Serial.print("Time waited:");
-  //Serial.println(millis()-millisCalc);
-
+  Serial.print("Time waited:");
+  Serial.println(millis() - millisCalc);
+#else
+  while (millis() < timeMillis + periodMs) {
+    // wait a bit so that the loop is executet every periodMS ms
+  }
+#endif
 
   // Reload the WDTs RR[0] reload register
   // if this line isn't called at least every 2 seconds, the TIMEOUT event is called and the CPU is reset
   // uncomment this if the watchdog is used
   //NRF_WDT->RR[0] = WDT_RR_RR_Reload;
 }
-
 
 
 void exampleSteps() {
@@ -219,7 +236,7 @@ void exampleBodyMovement() {
     int b = map(loopCounter, 2100, 2250, 0, 150);
     myHexapod.calcBodyMovement(legPositions, newPositions, 0, 0, 0, b / 1000.0, b / 1000.0, 0.0);
 
-  } else if (loopCounter < 2400){
+  } else if (loopCounter < 2400) {
     int b = map(loopCounter, 2250, 2400, 150, 0);
     myHexapod.calcBodyMovement(legPositions, newPositions, 0, 0, 0, b / 1000.0, b / 1000.0, 0.0);
 

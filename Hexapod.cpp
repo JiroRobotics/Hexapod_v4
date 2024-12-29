@@ -17,7 +17,7 @@ bool Hexapod::moveHome() {
   }
 }
 
-void Hexapod::calcBodyMovement(int prevPositions[6][3], int newPositions[6][3], int16_t xTrans, int16_t yTrans, int16_t zTrans, float roll, float pitch, float yaw, uint8_t legMask) {
+void Hexapod::calcBodyMovement(float prevPositions[6][3], float newPositions[6][3], int16_t xTrans, int16_t yTrans, int16_t zTrans, float roll, float pitch, float yaw, uint8_t legMask) {
   /*
    * calculates the next position for each leg in local x-y-z coordinates to achieve the specified translation and rotation
    * prevPositions: 6x3 array to get the leg position without translation and rotation
@@ -58,7 +58,7 @@ void Hexapod::calcBodyMovement(int prevPositions[6][3], int newPositions[6][3], 
     if (legMask & (1 << (5 - k))) {
 
       // rotate the local coordinate system by the angle specified in legCoords[][]
-      int temp = newPositions[k][0];
+      float temp = newPositions[k][0];
       newPositions[k][0] = newPositions[k][0] * cos(-legCoords[k][2]) - newPositions[k][1] * sin(-legCoords[k][2]);
       newPositions[k][1] = temp * sin(-legCoords[k][2]) + newPositions[k][1] * cos(-legCoords[k][2]);
 
@@ -95,7 +95,7 @@ void Hexapod::calcBodyMovement(int prevPositions[6][3], int newPositions[6][3], 
   }
 }
 
-bool Hexapod::calcStep(int prevPositions[6][3], int newPositions[6][3], float stepDirection, uint8_t radius, uint16_t stepNumber, float overlayRotation, uint8_t stepHeight) {
+bool Hexapod::calcStep(float prevPositions[6][3], float newPositions[6][3], float stepDirection, uint8_t radius, uint16_t stepNumber, float overlayRotation, uint8_t stepHeight) {
   /*
    * Calculates the position of the leg end point in local coordinates for all legs during a step.
    * One set of legs moves the robot, the other set moves to the best spot for the next step, assuming the next step is taken in the same
@@ -116,15 +116,13 @@ bool Hexapod::calcStep(int prevPositions[6][3], int newPositions[6][3], float st
    */
 
   if (stepCounter == 1) {
-    action = 5;  // the robot is executing a step
+    action = 1;  // the robot is executing a step
     // figure out which three legs will be lifted and which legs will stay on the ground
     // legs FR, ML, RR are lifted by default
     uint8_t liftingLegs[3] = { 0, 3, 4 };
     moveRightLeg = false;
     // the other legs touch the ground
     uint8_t stationaryLegs[3] = { 1, 2, 5 };
-    // angles at which the legs are mounted (FR at 30°, FL at 150°, MR at 0, ...)
-    const float legAngles[6] = { cornerLegAngle, cornerLegAngle * 5, 0, cornerLegAngle * 6, -cornerLegAngle, cornerLegAngle * 7 };
     // determine whether the other set of legs should be lifted, based on the previously moved legs and the new direction
     if ((prevRightLeg == false && abs(stepDirection - prevDirection) <= PI / 2) || (prevRightLeg == true && abs(stepDirection - prevDirection) > PI / 2)) {
       // lift legs FR, ML, RR
@@ -145,9 +143,9 @@ bool Hexapod::calcStep(int prevPositions[6][3], int newPositions[6][3], float st
       // move the leg to the optimal position for the next step, assuming the next step is in the same direction
       // the optimal leg position for the next step lies on the circle circumference in the opposite direction of movement
       // x value
-      finalPositions[liftingLegs[i]][0] = homePos[0] + radius * cos(stepDirection + legAngles[liftingLegs[i]]) * 1.0;
+      finalPositions[liftingLegs[i]][0] = homePos[0] + radius * cos(stepDirection + legCoords[liftingLegs[i]][2]) * 1.0;
       // y value
-      finalPositions[liftingLegs[i]][1] = homePos[1] + radius * sin(stepDirection + legAngles[liftingLegs[i]]) * 1.0;
+      finalPositions[liftingLegs[i]][1] = homePos[1] + radius * sin(stepDirection + legCoords[liftingLegs[i]][2]) * 1.0;
     }
 
     // calculate end positions for legs which are not lifted
@@ -156,35 +154,34 @@ bool Hexapod::calcStep(int prevPositions[6][3], int newPositions[6][3], float st
 
       // the leg tip moves from the current position in a straight line in the given direction. Find the intersection of this line with the circle
       // which is the furthest in this direction:
-      lineCircleIntersect(homePos[0], homePos[1], radius, prevPositions[stationaryLegs[i]][0], prevPositions[stationaryLegs[i]][1], stepDirection + legAngles[stationaryLegs[i]], intersections);
-      int index = getOppositeIntersection(prevPositions[stationaryLegs[i]][0], prevPositions[stationaryLegs[i]][1], stepDirection + legAngles[stationaryLegs[i]], intersections);
+      lineCircleIntersect(homePos[0], homePos[1], radius, prevPositions[stationaryLegs[i]][0], prevPositions[stationaryLegs[i]][1], stepDirection + legCoords[stationaryLegs[i]][2], intersections);
+      int index = getOppositeIntersection(prevPositions[stationaryLegs[i]][0], prevPositions[stationaryLegs[i]][1], stepDirection + legCoords[stationaryLegs[i]][2], intersections);
       // intersections[index][0] and intersections[index][1] are the final x/y leg positions (if they exist)
       if (intersections[index][0] != -1 && intersections[index][1] != -1) {
         finalPositions[stationaryLegs[i]][0] = intersections[index][0];
         finalPositions[stationaryLegs[i]][1] = intersections[index][1];
       } else {
         // if there is no intersection, just leave the legs where they are
-        finalPositions[stationaryLegs[i]][0] = prevPositions[0][0];
-        finalPositions[stationaryLegs[i]][1] = prevPositions[0][1];
+        finalPositions[stationaryLegs[i]][0] = prevPositions[stationaryLegs[i]][0];
+        finalPositions[stationaryLegs[i]][1] = prevPositions[stationaryLegs[i]][1];
       }
     }
 
     // The below code is necessary to let all legs start from random positions inside the circle
     // If the step lengths aren't equal across all 3 legs, the shortest step length is picked and finalPositions of the two other legs is adjusted
     // assert that all step lengths are equal
-    uint16_t stepLengths[3] = { 0 };
-    uint16_t avgLength = 0;
+    float stepLengths[3] = { 0.0 };
+    float avgLength = 0.0;
     for (uint8_t i = 0; i < 3; ++i) {
       // calculate the step lengths
       stepLengths[i] = (prevPositions[stationaryLegs[i]][0] - finalPositions[stationaryLegs[i]][0]) * (prevPositions[stationaryLegs[i]][0] - finalPositions[stationaryLegs[i]][0]) + (prevPositions[stationaryLegs[i]][1] - finalPositions[stationaryLegs[i]][1]) * (prevPositions[stationaryLegs[i]][1] - finalPositions[stationaryLegs[i]][1]);
       avgLength += stepLengths[i];
     }
-
     // check whether all distances are approximatly equal
-    avgLength /= 3;
+    avgLength /= 3.0;
 
     // get the shortest distance
-    uint16_t minLength = stepLengths[0];
+    float minLength = stepLengths[0];
     for (uint8_t i = 1; i < 3; ++i) {
       if (stepLengths[i] < minLength) {
         minLength = stepLengths[i];
@@ -208,18 +205,20 @@ bool Hexapod::calcStep(int prevPositions[6][3], int newPositions[6][3], float st
         float dx = finalPositions[stationaryLegs[i]][0] - prevPositions[stationaryLegs[i]][0];
         float dy = finalPositions[stationaryLegs[i]][1] - prevPositions[stationaryLegs[i]][1];
 
-        // scale factor based on minLength
-        float scale = sqrt((float)minLength / (dx * dx + dy * dy));
+        if (dx != 0.0 || dy != 0.0) { // avoid division by zero
+          // scale factor based on minLength
+          float scale = sqrt(max(minLength / (dx * dx + dy * dy), 0.0));
 
-        // calc new final positions based on minLength
-        finalPositions[stationaryLegs[i]][0] = prevPositions[stationaryLegs[i]][0] + dx * scale;
-        finalPositions[stationaryLegs[i]][1] = prevPositions[stationaryLegs[i]][1] + dy * scale;
+          // calc new final positions based on minLength
+          finalPositions[stationaryLegs[i]][0] = prevPositions[stationaryLegs[i]][0] + dx * scale;
+          finalPositions[stationaryLegs[i]][1] = prevPositions[stationaryLegs[i]][1] + dy * scale;
+        }
       }
     }
 
     // the following allows for rotation to be added to the movement.
     //This isn't calculated to be inside of the circle anymore, therefore other precautions must be taken to avoid weird behavior / collisions
-    if ((overlayRotation > 0.02 && overlayRotation < 0.3) || (overlayRotation < -0.02 && overlayRotation > -0.3)) {  // avoid too crazy turn angles and unnecessary calculation
+    if ((overlayRotation > 0.01 && overlayRotation < 0.3) || (overlayRotation < -0.01 && overlayRotation > -0.3)) {  // avoid too crazy turn angles and unnecessary calculation
       uint8_t mask = 0b100110;                                                                                       // apply rotation only to the stationary legs FR, ML, RR
       if (moveRightLeg == false) {
         mask = 0b011001;  // change if the other set of legs (FL, MR, RL) if they are stationary
@@ -262,7 +261,7 @@ bool Hexapod::calcStep(int prevPositions[6][3], int newPositions[6][3], float st
   return false;
 }
 
-bool Hexapod::moveLegs(int positions[6][3]) {
+bool Hexapod::moveLegs(float positions[6][3]) {
   // move all legs to the new position and return true if every servo could reach the target
   bool flag0 = legFR.moveTo(positions[0][0], positions[0][1], positions[0][2]);
   bool flag1 = legFL.moveTo(positions[1][0], positions[1][1], positions[1][2]);
@@ -282,7 +281,7 @@ bool Hexapod::moveLegs(int positions[6][3]) {
   return action;
 }
 
-void Hexapod::lineCircleIntersect(int mX, int mY, int radius, int pX, int pY, float direction, int intersections[2][2]) {
+void Hexapod::lineCircleIntersect(float mX, float mY, int radius, float pX, float pY, float direction, int intersections[2][2]) {
   /*
    * calculates the two intersections of the line specified by pX and pY and direction with the 
    * circle centered around mX, mY with the given radius
@@ -294,29 +293,28 @@ void Hexapod::lineCircleIntersect(int mX, int mY, int radius, int pX, int pY, fl
    * intersections:   array containing the two intersections. (intersection[0][0], intersection[0][1]) is the first
    */
   // Shift the point (pX, pY) to the origin of the coordinate frame
-  int shiftedPX = pX - mX;
-  int shiftedPY = pY - mY;
+  float shiftedPX = pX - mX;
+  float shiftedPY = pY - mY;
 
-  // Split the direction in x and y components. Integer for faster computation
-  int scaleFactor = 100;
-  int dx = cos(direction) * scaleFactor + 0.5;
-  int dy = sin(direction) * scaleFactor + 0.5;
+  // Split the direction in x and y components.
+  float dx = cos(direction);
+  float dy = sin(direction);
 
   // coefficents for qudratic formula
-  int a = dx * dx + dy * dy;
-  int b = 2 * (dx * shiftedPX + dy * shiftedPY);
-  int c = shiftedPX * shiftedPX + shiftedPY * shiftedPY - radius * radius;
+  float a = dx * dx + dy * dy;
+  float b = 2 * (dx * shiftedPX + dy * shiftedPY);
+  float c = shiftedPX * shiftedPX + shiftedPY * shiftedPY - radius * radius;
 
-  int discriminant = b * b - 4 * a * c;
+  float discriminant = b * b - 4 * a * c;
 
-  if (discriminant < 0) {
+  if (discriminant < -1e-6) {
     // if there are no coefficients, set intersections to -1
     intersections[0][0] = intersections[0][1] = -1;
     intersections[1][0] = intersections[1][1] = -1;
     return;
   }
   // approximate the sqrt
-  int sqrt_discriminant = sqrt(discriminant) + 0.5;
+  float sqrt_discriminant = sqrt(max(0.0, discriminant));
 
   // calculate the quadratic formula
   float t1 = (-b + sqrt_discriminant) / (2.0 * a);
@@ -327,7 +325,7 @@ void Hexapod::lineCircleIntersect(int mX, int mY, int radius, int pX, int pY, fl
   intersections[0][1] = shiftedPY + t1 * dy + mY;
 
   // calculate the second intersection if there is one
-  if (discriminant > 0) {
+  if (discriminant > 1e-6) {
     intersections[1][0] = shiftedPX + t2 * dx + mX;
     intersections[1][1] = shiftedPY + t2 * dy + mY;
   } else {
@@ -335,7 +333,7 @@ void Hexapod::lineCircleIntersect(int mX, int mY, int radius, int pX, int pY, fl
   }
 }
 
-int Hexapod::getOppositeIntersection(int pX, int pY, float direction, int intersections[2][2]) {
+int Hexapod::getOppositeIntersection(float pX, float pY, float direction, int intersections[2][2]) {
   /*
    * Returns the intersection which lies further in the passed direction.
    *
@@ -361,7 +359,7 @@ int Hexapod::getOppositeIntersection(int pX, int pY, float direction, int inters
   return (projection1 > projection2) ? 0 : 1;
 }
 
-void Hexapod::interpolateStep(int newPositions[6][3], int prevPositions[6][3], int finalPositions[6][3], uint8_t stepHeight, uint16_t stepCounter, uint16_t stepNumber, bool moveRightLeg, bool moveAllLegs) {
+void Hexapod::interpolateStep(float newPositions[6][3], float prevPositions[6][3], float finalPositions[6][3], uint8_t stepHeight, uint16_t stepCounter, uint16_t stepNumber, bool moveRightLeg, bool moveAllLegs) {
   /*
    * Generates the movement pattern for one step. Largely based on linear interpolation between prevPositions and finalPositions.
    * Three legs are also lifted (specified by moveRightLeg) and moved faster than the stationary legs. This allows them to reach their position
@@ -405,7 +403,7 @@ void Hexapod::interpolateStep(int newPositions[6][3], int prevPositions[6][3], i
   if (moveAllLegs == true) {
     for (int i = 0; i < 3; ++i) {
       for (int j = 0; j < 3; ++j) {
-        newPositions[stationaryLegs[i]][j] = map(stepCounter, 0, stepNumber, prevPositions[stationaryLegs[i]][j], finalPositions[stationaryLegs[i]][j]);
+        newPositions[stationaryLegs[i]][j] = mapFloat(stepCounter, 0.0, stepNumber * 1.0, prevPositions[stationaryLegs[i]][j], finalPositions[stationaryLegs[i]][j]);
       }
     }
   }
@@ -417,7 +415,7 @@ void Hexapod::interpolateStep(int newPositions[6][3], int prevPositions[6][3], i
     // z coordinate is calculated seperatly
     for (int i = 0; i < 3; ++i) {
       for (int j = 0; j < 2; ++j) {
-        newPositions[liftingLegs[i]][j] = map(stepCounter, startNumber, targetNumber, prevPositions[liftingLegs[i]][j], finalPositions[liftingLegs[i]][j]);
+        newPositions[liftingLegs[i]][j] = mapFloat(stepCounter, startNumber * 1.0, targetNumber * 1.0, prevPositions[liftingLegs[i]][j], finalPositions[liftingLegs[i]][j]);
       }
     }
   }
@@ -428,12 +426,12 @@ void Hexapod::interpolateStep(int newPositions[6][3], int prevPositions[6][3], i
   if (stepCounter < upSteps) {
     //lifts legs
     for (int i = 0; i < 3; ++i) {
-      newPositions[liftingLegs[i]][2] = map(stepCounter, 0, upSteps, prevPositions[liftingLegs[i]][2], finalPositions[liftingLegs[i]][2] - stepHeight);
+      newPositions[liftingLegs[i]][2] = mapFloat(stepCounter, 0.0, upSteps * 1.0, prevPositions[liftingLegs[i]][2], finalPositions[liftingLegs[i]][2] - stepHeight);
     }
   } else if (stepCounter > downSteps) {
     // lower legs
     for (int i = 0; i < 3; ++i) {
-      newPositions[liftingLegs[i]][2] = map(stepCounter, downSteps, stepNumber, prevPositions[liftingLegs[i]][2] - stepHeight, finalPositions[liftingLegs[i]][2]);
+      newPositions[liftingLegs[i]][2] = mapFloat(stepCounter, downSteps * 1.0, stepNumber * 1.0, prevPositions[liftingLegs[i]][2] - stepHeight, finalPositions[liftingLegs[i]][2]);
     }
   } else {
     // keep the legs lifted
@@ -441,4 +439,8 @@ void Hexapod::interpolateStep(int newPositions[6][3], int prevPositions[6][3], i
       newPositions[liftingLegs[i]][2] = prevPositions[liftingLegs[i]][2] - stepHeight;
     }
   }
+}
+
+float Hexapod::mapFloat(float x, float in_min, float in_max, float out_min, float out_max) {
+  return (x - in_min) * (out_max - out_min) / (in_max - in_min) + out_min;
 }

@@ -12,16 +12,16 @@ public:
     : legFR(legFR), legFL(legFL), legMR(legMR), legML(legML), legRR(legRR), legRL(legRL) {}
 
   // calculates the next position for each leg and passes them to newPositions[][] array
-  void calcBodyMovement(int prevPositions[6][3], int newPositions[6][3], int16_t xTrans, int16_t yTrans, int16_t zTrans, float roll, float pitch, float yaw, uint8_t legMask = 0b111111);
+  void calcBodyMovement(float prevPositions[6][3], float newPositions[6][3], int16_t xTrans, int16_t yTrans, int16_t zTrans, float roll, float pitch, float yaw, uint8_t legMask = 0b111111);
   
   // calculates the leg end point coordinates and stores them in newPositions[][] for executing a step
-  bool calcStep(int prevPositions[6][3], int newPositions[6][3], float stepDirection, uint8_t radius, uint16_t stepNumber, float overlayRotation = 0.0, uint8_t stepHeight = 20);
+  bool calcStep(float prevPositions[6][3], float newPositions[6][3], float stepDirection, uint8_t radius, uint16_t stepNumber, float overlayRotation = 0.0, uint8_t stepHeight = 20);
 
   // method to instantly move all legs to the default (home) position. Returns true if successful
   bool moveHome();
 
   // method to instantly move the legs to their positions as specified in the array
-  bool moveLegs(int positions[6][3]);
+  bool moveLegs(float positions[6][3]);
 
   // returns the action which the hexapod performs at the moment. 0 = sleeping / doing nothing. 1 = doing a crabwalk step. 2 = rotating on the spot
   [[nodiscard]] uint8_t getAction();
@@ -36,10 +36,7 @@ private:
 
   // variable representing the current action of the hexapod.
   // 0 = sleeping / doing nothing
-  // 1 = doing a crab walk step
-  // 2 = rotating on the spot
-  // 3 = step with radius
-  // 5 = new CrabWalk
+  // 1 = doing a step
   uint8_t action = 0;
 
   // counter to keep track of the number of iterations in calcCrabwalk()
@@ -51,18 +48,24 @@ private:
   bool prevRightLeg = true;
 
   // array to save the end points of a crab walk step
-  int finalPositions[6][3] = { { homePos[0], homePos[1], homePos[2] },    // front right
-                               { homePos[0], homePos[1], homePos[2] },    // front left
-                               { homePos[0], homePos[1], homePos[2] },    // mid right
-                               { homePos[0], homePos[1], homePos[2] },    // mid left
-                               { homePos[0], homePos[1], homePos[2] },    // rear right
-                               { homePos[0], homePos[1], homePos[2] } };  // rear left
+  float finalPositions[6][3] = { { homePos[0], homePos[1], homePos[2] },    // front right
+                                 { homePos[0], homePos[1], homePos[2] },    // front left
+                                 { homePos[0], homePos[1], homePos[2] },    // mid right
+                                 { homePos[0], homePos[1], homePos[2] },    // mid left
+                                 { homePos[0], homePos[1], homePos[2] },    // rear right
+                                 { homePos[0], homePos[1], homePos[2] } };  // rear left
 
-  void lineCircleIntersect(int mX, int mY, int radius, int pX, int pY, float direction, int intersections[2][2]);
+  // used in calcStep
+  void lineCircleIntersect(float mX, float mY, int radius, float pX, float pY, float direction, int intersections[2][2]);
 
-  int getOppositeIntersection(int pX, int pY, float direction, int intersections[2][2]);
-    
-  void interpolateStep(int newPositions[6][3], int prevPositions[6][3], int finalPositions[6][3], uint8_t stepHeight, uint16_t stepCounter, uint16_t stepNumber, bool moveRightLeg, bool moveAllLegs = true);
+  // used in calcStep
+  int getOppositeIntersection(float pX, float pY, float direction, int intersections[2][2]);
+  
+  // used in calcStep
+  void interpolateStep(float newPositions[6][3], float prevPositions[6][3], float finalPositions[6][3], uint8_t stepHeight, uint16_t stepCounter, uint16_t stepNumber, bool moveRightLeg, bool moveAllLegs = true);
+
+  // map() only works with integers, not floating point numbers
+  float mapFloat(float x, float in_min, float in_max, float out_min, float out_max);
 };
 
 #endif /* Hexapod_H */
