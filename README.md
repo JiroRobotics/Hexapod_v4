@@ -2,6 +2,16 @@
 
 <img src="pictures/hexapod_v4_picture_2.jpg" alt="Hexapod prototype" width="600">
 
+## Quickstart
+
+1. Build your Hexapod
+2. Download this repository as well as all other necessary libraries
+3. Change angle() and angleFloat() in Leg.cpp to use the correct pulse lengths for your servos. The current configuration works for (one type of) MG92b servos.
+4. Take a close look at Config.h and change all values accordingly. You'll need to change all pins as well as all measurements.
+5. Also change the addresses of your servo drivers to the correct hex value.
+6. Figure out the offsets for each servo. If you write an angle of 90° to a servo, the corresponding joint should form a right angle. Keep these offsets as low as possible (-10° to 10°). You might also need to unscrew the joint and mount it at a different angle.
+7. The code works well on an Arduino Nano 33 BLE Sense. If you use other, less capable Arduinos like Nano 33 IOT, you might need to increase the periodMS setting in Config.h, until the Arduino is able to calculate everything in this time frame.
+
 ## Background
 
 Hexapods are six legged robots. They possess the ability to walk in any direction, each leg (in this case) with three joints resulting in a total of 18 degrees of freedom. In addition, their body can turn and rotate in any direction, making this type of legged robot extremely flexible. But six legs also allow for fast, statically determined walking gates, i.e. lifting three legs each step while the three other legs stay on the ground. This removes the challenge of balancing during one step. 
