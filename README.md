@@ -135,12 +135,14 @@ for (uint8_t k = 0; k < 6; ++k) {  // iterate over all legs
 }
 ```
 
-The code above iterates over all legs. The bitmask allows only specific legs to move. As standard, all legs are moved (<code>legMask = 0b111111</code>). The first bit (MSB) corresponds to the front right leg, the last bot (LSB) to the rear left leg.
+The code above iterates over all legs. The bitmask allows only specific legs to move. As standard, all legs are moved (<code>legMask = 0b111111</code>). The first bit (MSB) corresponds to the front right leg, the last bit (LSB) to the rear left leg.
 
 Improvements/additions would be to use quaternions for faster computation of the rotations or to just use 4x4 homogeneous matrices to first transform the coordinate frames and then calculate the translation and rotation in one step (and then transforming the frame back of course).
 
 ### Walking in any direction
 Two approaches exist to create a walking motion in any direction (aka crab walk). Both approaches lift three legs, while the other three legs move the body. For example, the front left, middle right and rear left legs are being lifted, while the front right, middle left and rear right legs push the hexapod in the desired direction. The first version is simpler, but doesn't allow for long step distances, thus resulting in a more "unnatural" motion:
+> [!NOTE]  
+> The code for this approach can be found in the "deprecated" branch.
 
 A "home position" is defined (in the local coordinate frame, as an (x, y, z) point), to which the three legs which were lifted return after every step. As a result, three legs are guaranteed to be at the home position in the beginning of each step. From there, new points are calculated for each of the three legs. These new points describe the final position of the legs at the end of the step. The other legs (which were previously **not** at home position) just return to home position.
 Final positions for the three legs can be calculated by simply transforming (rotating) the vector by which the hexapod moves in the local coordinate system and then subtracting the vector from the home position. This vector can be passed to the method as two parameters, namely stepDist and stepDirection. stepDist is the length of the vector by which the hexapod moves while stepDirection is the angle, in which the step is taken (simply a 2D-vector in polar coordinates). For example, <code>stepDist = 20</code> and <code>stepDirection = PI</code> will result in a step with a length of 20mm backwards (PI (rad) = 180°).
