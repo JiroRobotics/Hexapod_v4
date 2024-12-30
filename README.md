@@ -80,9 +80,13 @@ As mentioned above, the six leg classes are passed to one Hexapod class which co
 * **Offroad mode:** Still needs to be implemented. Using the end switches, the robot will detect whether its legs touch the surface and adjust the z coordinate accordingly.
 
 ### Calculating points for each leg
-Since we have one coordinate frame in the center of mass of the robot and six local coordinate frames, one in the coxa joint of each leg, we need to convert between the frames. This can be done in multiple ways, for example using rotation matrices and shifting of the planes. 
+The position and orientation of the different coordinate frames can be seen in the picture below. The coordinate frame in the center of the robot is referred to as global coordinate system (altough base coordinate system would probably be more precise). The six local coordinate frames have their origin in the coxa joint of their leg respectively. 
 
-To calculate the new end point of a leg in the local coordinate frame resulting from a translation along one of the axis of the coordinate frame in the center of mass, we first need to shift and rotate the local frame to match the frame in the center of mass. To keep the code simple, an array is used to store the relative distances and angles between the local coordinate systems of each leg and the global coordinate system this array (<code>legCoords[][]</code>) is specified in [Config.h](Config.h).
+<img src="pictures/HexapodCoordinateFrames.png" alt="Image of the global and the six local coordinate systems" width="600">
+
+The Leg class can only work with coordinates in the local coordinate system of the leg, while the motion planning takes place in the global coordinate frame. Therefore we need to transform between the coordinate frames. This can be done in multiple ways, for example using rotation matrices and shifting of the planes. 
+
+To calculate the new end point of a leg in the local coordinate frame resulting from a translation along one of the axis of the global coordinate frame, we first need to shift and rotate the local frame to match the frame in the center of mass. To keep the code simple, an array is used to store the relative distances and angles between the local coordinate frame of each leg and the global coordinate system. This array (<code>legCoords[][]</code>) is specified in [Config.h](Config.h).
 
 Now, the desired translation and rotation can be applied. First, the end point is shifted by the desired amount to achieve the translation. Second, the point is rotated by multiplying it with rotMatrix[][], which is a complete 3x3 roll pitch yaw rotation matrix.
 At last, the local coordinate frame has to be transformed back, first shifting it and then rotating it.
