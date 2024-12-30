@@ -7,10 +7,12 @@
 1. Build your Hexapod
 2. Download this repository as well as all other necessary libraries
 3. Change angle() and angleFloat() in Leg.cpp to use the correct pulse lengths for your servos. The current configuration works for (one type of) MG92b servos.
-4. Take a close look at Config.h and change all values accordingly. You'll need to change all pins as well as all measurements.
-5. Also change the addresses of your servo drivers to the correct hex value.
-6. Figure out the offsets for each servo. If you write an angle of 90° to a servo, the corresponding joint should form a right angle. Keep these offsets as low as possible (-10° to 10°). You might also need to unscrew the joint and mount it at a different angle.
-7. The code works well on an Arduino Nano 33 BLE Sense. If you use other, less capable Arduinos like Nano 33 IOT, you might need to increase the periodMS setting in Config.h, until the Arduino is able to calculate everything in this time frame.
+4. The isReachable() method of the Leg class is highly dependent on the geometry of your robot, therefore it also needs to be changed if you don't use the CAD files.
+5. Take a close look at Config.h and change all values accordingly. You'll need to change all pins as well as all measurements.
+6. Also change the addresses of your servo drivers to the correct hex value.
+7. Double check your wiring and provide the Leg() constructors in Hexapod_v4.ino with the correct PWM Module.
+8. Figure out the offsets for each servo. If you write an angle of 90° to a servo, the corresponding joint should form a right angle. Keep these offsets as low as possible (-10° to 10°). You might also need to unscrew the joint and mount it at a different angle.
+9. The code works well on an Arduino Nano 33 BLE Sense. If you use other, less capable Arduinos like Nano 33 IOT, you might need to increase the periodMS setting in Config.h, until the Arduino is able to calculate everything in this time frame.
 
 ## Background
 
@@ -24,7 +26,7 @@ In addition to the code in this repository, you will need two additional librari
 
 ## Hardware
 
-The robot is comprised of a 3D-printed body and six legs (CAD parts to be added). The four corner legs are turned by an angle of 30° relative to the middle legs, thus requiring more complex code. Consider mounting the corner legs parallel to the middle legs in your project to avoid the need for more coordinate transformation in your code. 
+The robot is comprised of a 3D-printed body and six legs. The four corner legs are turned by an angle of 30° relative to the middle legs, thus requiring more complex code. Consider mounting the corner legs parallel to the middle legs in your project to avoid the need for more coordinate transformation in your code. 
 Each leg consists of three joints and three links refered to as coxa, femur and tibia. Each joint is directly screwed to the servo on one side and on the other a tiny bearing is used to reduce friction, add strength and avoid wear and tear.
 The coxa link incorporates a limit switch to detect whether the leg is touching the ground. If the leg is touching the ground, the weight doesn't rest on the switch but the surrounding structure.
 
@@ -38,9 +40,7 @@ The code for this robot was entirely written in C++ (or rather the Arduino versi
 * A Hexapod class which is an aggregation of six leg instances. This class covers all movement patterns (such as crab walk, translation and rotation on the spot, turning, ...).
 * The main Arduino programm, which is comprised of the setup() and the loop()-part. The setup()-part is run once and covers all the initialization of the servo drivers as well as setting pin modes, starting the IMU and so on. The loop() function is coded so that it is executed every 10ms, giving the hexapod an update rate of 100Hz. This means that the leg positions are calculated and the legs are moved to their positions every 10ms or 100 times a second. Running a fixed update rate allows for more flexible movement as a step is not necessarily excecuted as a whole and other movements can be superimposed.
 
-(UML diagram to be added)
-
-Let's take a look at the math-heavy challenges for this project
+Let's take a look at the math-heavy challenges for this project:
 
 ### Inverse kinematics of one leg
 **Goal:** given a point (x, y, z) in the local coordinate frame of the leg, calculate the joint angles of the three servo motors so that the end point of the leg reaches the desired point
@@ -52,18 +52,18 @@ A, B and C are the coxa, femur and tibia joints while D is the desired point giv
 The values for the femur and tibia joint are a bit more complex. First, we need to calculate two distances: L1 and L. L1 is simply the distance from the z-axis to point D, which can be found using the pythagorean theorem. L1 can than be used to calculate L, which is the distance from B to D. Again, it is found by using the pythagorean theorem. Now, by applying the law of cosine, the angles of the triangle BCD can be found. Make sure to shift/mirror the values to match the orientation of the servos. The code for calculating all three angles is as follows:
 
 ```
-int coxaAngle = atan2(yValue, xValue) * 180 / PI;
+float coxaAngle = atan2(yValue, xValue) * 180 / PI;
 coxaAngle = map(coxaAngle, 0, 180, 180, 0);
-int femurAngle = (acos(zValue / L) + acos((tibiaLength * tibiaLength - femurLength * femurLength - L * L) / (-2 * femurLength * L))) * 180 / PI;
-int tibiaAngle = (acos((L * L - tibiaLength * tibiaLength - femurLength * femurLength) / (-2 * tibiaLength * femurLength))) * 180 / PI;
+float femurAngle = (acos(zValue / L) + acos((tibiaLength * tibiaLength - femurLength * femurLength - L * L) / (-2 * femurLength * L))) * 180 / PI;
+float tibiaAngle = (acos((L * L - tibiaLength * tibiaLength - femurLength * femurLength) / (-2 * tibiaLength * femurLength))) * 180 / PI;
 ```
 
 The last thing to do is to actually move the servos. This can be achieved by calling the following line:
 
 ```
-servoDriver.setPWM(pinCoxa, 0, angle(coxaAngle + offsetCoxa));
+servoDriver.setPWM(pinCoxa, 0, angleFloat(coxaAngle + offsetCoxa));
 ```
-angle() is a function to convert the angle in degrees to the corresponding pulse width of the PWM signal (also described in the Adafruit Servo Driver documentation). The values in angle() have to be adjusted if another type of servo is used. offsetCoxa is the offset (in degrees) by which the (real) position of the leg differs compared to the ideal position. Find these values by assembling the robot, setting all servos to for example 90° and adjust the offsets until all joints are perfectly perpendicular.
+angleFloat() is a function to convert the angle in degrees to the corresponding pulse width of the PWM signal (also described in the Adafruit Servo Driver documentation). The values in angleFloat() have to be adjusted if another type of servo is used. offsetCoxa is the offset (in degrees) by which the (real) position of the leg differs compared to the ideal position. Find these values by assembling the robot, setting all servos to for example 90° and adjust the offsets until all joints are perfectly perpendicular.
 
 ### Calculating valid points
 The leg can't reach every (x, y, z) point in 3D space. If we instruct the leg to move to an unreachable point, weird things can happen, potentionally even breaking the robot. Even if all points passed to the leg function _should_ be reachable, it is recommended to implement the following as a last safeguard:
@@ -128,7 +128,7 @@ for (uint8_t k = 0; k < 6; ++k) {  // iterate over all legs
       newPositions[k][0] = newPositions[k][0] * cos(legCoords[k][2]) - newPositions[k][1] * sin(legCoords[k][2]);
       newPositions[k][1] = temp * sin(legCoords[k][2]) + newPositions[k][1] * cos(legCoords[k][2]);
     }
-  }
+}
 ```
 
 The code above iterates over all legs. The bitmask allows only specific legs to move. As standard, all legs are moved (<code>legMask = 0b111111</code>). The first bit (MSB) corresponds to the front right leg, the last bot (LSB) to the rear left leg.
@@ -156,7 +156,5 @@ if ((overlayRotation > 0.02 && overlayRotation < 0.3) || (overlayRotation < -0.0
 }
 ```
 
-(Image to be added)
-
 ### Main loop
-As already mentioned, the <code>loop()</code> function is called every 10ms. During each loop iteration, the legs are moved once using <code>myHexapod.moveLegs(newPositions)</code>. <code>newPositions[][]</code> can be can be calculated using either <code>myHexapod.calcStep()</code>, <code>myHexapod.calcBodyMovement()</code> or both. Example usage is provided in <code>exampleSteps()</code> and <code>exampleBodyMovement()</code>. The <code>myHexapod.getAction()</code> method can be used to check whether the robot is executing a step or resting at the moment. Additionally, a loopCounter is used to keep track of the number of times the loop has been executed. The green LED of the Arduino BLE is also toggled in every loop.
+As already mentioned, the <code>loop()</code> function is called every 10ms (or as specified in Config.h). During each loop iteration, the legs are moved once using <code>myHexapod.moveLegs(newPositions)</code>. <code>newPositions[][]</code> can be can be calculated using either <code>myHexapod.calcStep()</code>, <code>myHexapod.calcBodyMovement()</code> or both. Example usage is provided in <code>exampleSteps()</code> and <code>exampleBodyMovement()</code>. The <code>myHexapod.getAction()</code> method can be used to check whether the robot is executing a step or resting at the moment. Additionally, a loopCounter is used to keep track of the number of times the loop has been executed. The green LED of the Arduino BLE is also toggled in every loop (yellow LED on other Arduinos).
