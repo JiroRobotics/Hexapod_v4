@@ -214,16 +214,34 @@ bool Hexapod::calcStep(float prevPositions[6][3], float newPositions[6][3], floa
           finalPositions[stationaryLegs[i]][1] = prevPositions[stationaryLegs[i]][1] + dy * scale;
         }
       }
+
+      // Add the current step to the global position
+      globalXPosition += sqrt(minLength) * cos(globalOrientation);
+      globalYPosition += sqrt(minLength) * sin(globalOrientation);
+    } else {
+      // Add the current step to the global position
+      globalXPosition += sqrt(avgLength) * cos(globalOrientation);
+      globalYPosition += sqrt(avgLength) * sin(globalOrientation);
     }
 
     // the following allows for rotation to be added to the movement.
-    //This isn't calculated to be inside of the circle anymore, therefore other precautions must be taken to avoid weird behavior / collisions
+    // This isn't calculated to be inside of the circle anymore, therefore other precautions must be taken to avoid weird behavior / collisions
     if ((overlayRotation > 0.01 && overlayRotation < 0.3) || (overlayRotation < -0.01 && overlayRotation > -0.3)) {  // avoid too crazy turn angles and unnecessary calculation
       uint8_t mask = 0b100110;                                                                                       // apply rotation only to the stationary legs FR, ML, RR
       if (moveRightLeg == false) {
         mask = 0b011001;  // change if the other set of legs (FL, MR, RL) if they are stationary
       }
-      calcBodyMovement(finalPositions, finalPositions, 0, 0, 0, 0.0, 0.0, overlayRotation, mask);
+      // call calcBodyMovement with inverted rotation to get mathematically positive rotation
+      calcBodyMovement(finalPositions, finalPositions, 0, 0, 0, 0.0, 0.0, -overlayRotation, mask);
+
+      // keep track of the orientation compared to global coordinate system
+      globalOrientation += overlayRotation;
+      // Only the Interval [PI, -PI] is used
+      if(globalOrientation > PI){
+        globalOrientation -= 2*PI;
+      } else if(globalOrientation < -PI){
+        globalOrientation += 2*PI;
+      }
     }
   }
 
@@ -275,10 +293,6 @@ bool Hexapod::moveLegs(float positions[6][3]) {
   } else {
     return false;
   }
-}
-
-[[nodiscard]] uint8_t Hexapod::getAction() {
-  return action;
 }
 
 void Hexapod::lineCircleIntersect(float mX, float mY, int radius, float pX, float pY, float direction, int intersections[2][2]) {
@@ -443,4 +457,20 @@ void Hexapod::interpolateStep(float newPositions[6][3], float prevPositions[6][3
 
 float Hexapod::mapFloat(float x, float in_min, float in_max, float out_min, float out_max) {
   return (x - in_min) * (out_max - out_min) / (in_max - in_min) + out_min;
+}
+
+[[nodiscard]] uint8_t Hexapod::getAction() {
+  return action;
+}
+
+[[nodiscard]] float Hexapod::getGlobalOrientation() {
+  return globalOrientation;
+}
+
+[[nodiscard]] float Hexapod::getGlobalXPos() {
+  return globalXPosition;
+}
+
+[[nodiscard]] float Hexapod::getGlobalYPos() {
+  return globalYPosition;
 }

@@ -26,6 +26,11 @@ public:
   // returns the action which the hexapod performs at the moment. 0 = sleeping / doing nothing. 1 = doing a crabwalk step. 2 = rotating on the spot
   [[nodiscard]] uint8_t getAction();
 
+  // getters for the pose of the robot in the global coordinate system
+  [[nodiscard]] float getGlobalOrientation();
+  [[nodiscard]] float getGlobalXPos();
+  [[nodiscard]] float getGlobalYPos();
+  
 private:
   Leg &legFR;
   Leg &legFL;
@@ -44,8 +49,14 @@ private:
   // indicator whether to move legs FR, ML, RR or legs FL, MR, RL
   bool moveRightLeg = true;
 
+  // keep track of the previous step in order to determine which legs to lift
   float prevDirection = 0.0;
   bool prevRightLeg = true;
+
+  // the following describes the (2D) pose of the base coordinate system and the global coordinate system
+  float globalOrientation = 0.0;
+  float globalXPosition = 0.0;
+  float globalYPosition = 0.0;
 
   // array to save the end points of a crab walk step
   float finalPositions[6][3] = { { homePos[0], homePos[1], homePos[2] },    // front right

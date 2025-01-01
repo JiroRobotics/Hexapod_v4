@@ -65,6 +65,7 @@ void setup() {
   // used for debug
   Serial.begin(9600);
 #endif
+  Serial.begin(9600);
 
   // start pwm on the servo drivers with 50Hz frequency
   pwm1.begin();
@@ -97,11 +98,21 @@ void loop() {
   // exemplary movements of the robot
   // uncomment one of the following
   //exampleBodyMovement();
-  //exampleSteps();
-  exampleSteps2();
+  exampleSteps();
+  //exampleSteps2();
 
   // update the leg position
   myHexapod.moveLegs(newPositions);
+
+  if(myHexapod.getAction() == 0){
+    Serial.print("Position (x, y): ");
+    Serial.print(myHexapod.getGlobalXPos());
+    Serial.print(", ");
+    Serial.println(myHexapod.getGlobalYPos());
+    Serial.print("Heading: ");
+    Serial.println(myHexapod.getGlobalOrientation());
+    Serial.println("==========================");
+  }
 
   // increment the loopCounter to keep track of the number of loop cycles
   loopCounter++;
@@ -182,7 +193,7 @@ void exampleSteps2() {
       counter = 0;
     }
   }
-  float newDir = PI + (counter - 1) * 0.15;
+  float newDir = PI - (counter - 1) * 0.15;
   myHexapod.calcStep(legPositions, currPositions, newDir, 20, 120, 0.15, 20);
 
   // Adjust the body position each loop() iteration. This allows for superimposition of body movement independently of the step
