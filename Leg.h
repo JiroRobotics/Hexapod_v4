@@ -10,7 +10,9 @@ class Leg {
 public:
   // Constructor. Arguments are reference to PWM servo driver module, the 3 servos + according offsets and the push-button
   Leg(Adafruit_PWMServoDriver &servoDriver, uint8_t pinCoxa, uint8_t pinFemur, uint8_t pinTibia, int offsetCoxa, int offsetFemur, int offsetTibia, bool rightSide, uint8_t pinPushButton)
-    : servoDriver(servoDriver), pinCoxa(pinCoxa), pinFemur(pinFemur), pinTibia(pinTibia), offsetCoxa(offsetCoxa), offsetFemur(offsetFemur), offsetTibia(offsetTibia), rightSide(rightSide), pinPushButton(pinPushButton) {}
+    : servoDriver(servoDriver), pinCoxa(pinCoxa), pinFemur(pinFemur), pinTibia(pinTibia), offsetCoxa(offsetCoxa), offsetFemur(offsetFemur), offsetTibia(offsetTibia), rightSide(rightSide), pinPushButton(pinPushButton) {
+    pinMode(pinPushButton, INPUT);
+  }
 
   void setAngle(uint8_t servoPin, int offset, int angleVal);
 

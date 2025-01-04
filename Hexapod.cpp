@@ -3,6 +3,8 @@
 
 #include "Hexapod.h"
 
+//#define DEBUG
+
 bool Hexapod::moveHome() {
   /* 
    * moves all legs instantly to the home position.
@@ -17,7 +19,7 @@ bool Hexapod::moveHome() {
   }
 }
 
-void Hexapod::calcBodyMovement(float prevPositions[6][3], float newPositions[6][3], int16_t xTrans, int16_t yTrans, int16_t zTrans, float roll, float pitch, float yaw, uint8_t legMask) {
+void Hexapod::calcBodyMovement(float prevPositions[6][3], float newPositions[6][3], float xTrans, float yTrans, float zTrans, float roll, float pitch, float yaw, uint8_t legMask) {
   /*
    * calculates the next position for each leg in local x-y-z coordinates to achieve the specified translation and rotation
    * prevPositions: 6x3 array to get the leg position without translation and rotation
@@ -157,7 +159,7 @@ bool Hexapod::calcStep(float prevPositions[6][3], float newPositions[6][3], floa
       lineCircleIntersect(homePos[0], homePos[1], radius, prevPositions[stationaryLegs[i]][0], prevPositions[stationaryLegs[i]][1], stepDirection + legCoords[stationaryLegs[i]][2], intersections);
       int index = getOppositeIntersection(prevPositions[stationaryLegs[i]][0], prevPositions[stationaryLegs[i]][1], stepDirection + legCoords[stationaryLegs[i]][2], intersections);
       // intersections[index][0] and intersections[index][1] are the final x/y leg positions (if they exist)
-      if (intersections[index][0] != -1 && intersections[index][1] != -1) {
+      if (intersections[index][0] != -1000 && intersections[index][1] != -1000) {
         finalPositions[stationaryLegs[i]][0] = intersections[index][0];
         finalPositions[stationaryLegs[i]][1] = intersections[index][1];
       } else {
@@ -166,8 +168,7 @@ bool Hexapod::calcStep(float prevPositions[6][3], float newPositions[6][3], floa
         finalPositions[stationaryLegs[i]][1] = prevPositions[stationaryLegs[i]][1];
       }
     }
-
-    // The below code is necessary to let all legs start from random positions inside the circle
+    // The code below is necessary to let all legs start from random positions inside the circle
     // If the step lengths aren't equal across all 3 legs, the shortest step length is picked and finalPositions of the two other legs is adjusted
     // assert that all step lengths are equal
     float stepLengths[3] = { 0.0 };
@@ -205,7 +206,7 @@ bool Hexapod::calcStep(float prevPositions[6][3], float newPositions[6][3], floa
         float dx = finalPositions[stationaryLegs[i]][0] - prevPositions[stationaryLegs[i]][0];
         float dy = finalPositions[stationaryLegs[i]][1] - prevPositions[stationaryLegs[i]][1];
 
-        if (dx != 0.0 || dy != 0.0) { // avoid division by zero
+        if (dx != 0.0 || dy != 0.0) {  // avoid division by zero
           // scale factor based on minLength
           float scale = sqrt(max(minLength / (dx * dx + dy * dy), 0.0));
 
@@ -216,12 +217,12 @@ bool Hexapod::calcStep(float prevPositions[6][3], float newPositions[6][3], floa
       }
 
       // Add the current step to the global position
-      globalXPosition += sqrt(minLength) * cos(globalOrientation);
-      globalYPosition += sqrt(minLength) * sin(globalOrientation);
+      globalXPosition += sqrt(minLength) * cos(stepDirection + globalOrientation) * lengthAccuracy;
+      globalYPosition += sqrt(minLength) * sin(stepDirection + globalOrientation) * lengthAccuracy;
     } else {
       // Add the current step to the global position
-      globalXPosition += sqrt(avgLength) * cos(globalOrientation);
-      globalYPosition += sqrt(avgLength) * sin(globalOrientation);
+      globalXPosition += sqrt(avgLength) * cos(stepDirection + globalOrientation) * lengthAccuracy;
+      globalYPosition += sqrt(avgLength) * sin(stepDirection + globalOrientation) * lengthAccuracy;
     }
 
     // the following allows for rotation to be added to the movement.
@@ -235,12 +236,12 @@ bool Hexapod::calcStep(float prevPositions[6][3], float newPositions[6][3], floa
       calcBodyMovement(finalPositions, finalPositions, 0, 0, 0, 0.0, 0.0, -overlayRotation, mask);
 
       // keep track of the orientation compared to global coordinate system
-      globalOrientation += overlayRotation;
+      globalOrientation += overlayRotation * rotateAccuracy;
       // Only the Interval [PI, -PI] is used
-      if(globalOrientation > PI){
-        globalOrientation -= 2*PI;
-      } else if(globalOrientation < -PI){
-        globalOrientation += 2*PI;
+      if (globalOrientation > PI) {
+        globalOrientation -= 2 * PI;
+      } else if (globalOrientation < -PI) {
+        globalOrientation += 2 * PI;
       }
     }
   }
@@ -295,6 +296,152 @@ bool Hexapod::moveLegs(float positions[6][3]) {
   }
 }
 
+void Hexapod::step(float legPos[6][3], float stepDirection, uint8_t radius, uint16_t stepNumber, float overlayRotation, uint8_t stepHeight) {
+  /*
+   * Wrapper function to easily perform a step. Note that this function is blocking and doesn't allow for superimposition of other movement.
+   * 
+   * legPos[][]:      Array containing the positions of the legs before starting the step
+   * stepDirection:   Direction (rad) in which the step is taken. 0 is forwards, PI is backwards, PI/2 is to the right.
+   * radius:          Radius of the circle in which the legs will move. Equivalent to the maximum step length
+   * stepNumber:      Number of iterations. periodMS * stepNumber = step duration
+   * overlayRotation: Rotation around z axis during the step.
+   * stepHeight:      Distance (mm) by which the legs are lifted.
+   */
+  // array to save the leg positions for each iteration
+  float posArray[6][3];
+
+  do {
+    unsigned long startTime = millis();
+
+    this->calcStep(legPos, posArray, stepDirection, radius, stepNumber, overlayRotation, stepHeight);
+    this->moveLegs(posArray);
+
+    while (millis() < startTime + periodMs) {
+      // wait a bit so that the loop is executet every periodMS ms
+    }
+  } while (this->getAction() != 0);
+}
+
+bool Hexapod::travelPath(float legPos[6][3], int16_t pathPoints[][2], uint8_t numPoints, uint16_t iterationNumber, uint8_t pathType, float maxRotationPerStep, uint8_t stepHeight) {
+  /*
+   * Calculates and takes steps in order to reach the provided points one after another.
+   * 
+   * legPos[][]:      Array containing the leg position in the beginning of the step
+   * pathPoints[][]:  Array containing the (x, y) points which the robot should travel to
+   * numPoints:       number of points in the pathPoints array
+   * iterationNumber: number of iterations per step. Fewer iterations result in faster movement
+   * pathType:        either 0 or 1. 0: walking and rotating. 1: walking without rotation, maintaining the same heading
+   *
+   */
+
+  // iterate over all provided points
+  for (uint8_t i = 0; i < numPoints; ++i) {
+#ifdef DEBUG
+    Serial.print("Next Target Point (x, y): ");
+    Serial.print(pathPoints[i][0]);
+    Serial.print(", ");
+    Serial.println(pathPoints[i][1]);
+    Serial.println("=============================");
+#endif
+    // calculate the distance from the current position to the desired position
+    float distToGoal = (this->getGlobalXPos() - pathPoints[i][0]) * (this->getGlobalXPos() - pathPoints[i][0]) + (this->getGlobalYPos() - pathPoints[i][1]) * (this->getGlobalYPos() - pathPoints[i][1]);
+    distToGoal = sqrt(distToGoal);
+
+    // accuracy = 30mm
+    while (distToGoal > 30) {
+      // compute the direction of the desired point
+      float goalDirection = atan2(pathPoints[i][1] - this->getGlobalYPos(), pathPoints[i][0] - this->getGlobalXPos());
+
+      // walk with rotation
+      if (pathType == 0) {
+        // get the difference between the current heading and the desired direction
+        float directionError = goalDirection - this->getGlobalOrientation();
+        if (directionError > PI) {
+          directionError -= 2 * PI;
+        } else if (directionError < -PI) {
+          directionError += 2 * PI;
+        }
+
+        // rotation specifies by which amount the robot rotates during the next step
+        float rotation = 0.0;
+        if (directionError > maxRotationPerStep) {
+          rotation = maxRotationPerStep;
+        } else if (directionError < -maxRotationPerStep) {
+          rotation = -maxRotationPerStep;
+        } else {
+          rotation = directionError;
+        }
+        // the radius determines the step length
+        uint8_t maxRadius = 30;
+        if (abs(rotation) > 0.08) {
+          maxRadius = 20;
+        }
+        uint8_t radius = min(distToGoal / 2, maxRadius);
+
+        // execute the step
+        this->step(legPos, 0.0, radius, iterationNumber, rotation);
+#ifdef DEBUG
+        Serial.print("Position (x, y): ");
+        Serial.print(this->getGlobalXPos());
+        Serial.print(", ");
+        Serial.println(this->getGlobalYPos());
+        Serial.print("Heading: ");
+        Serial.println(this->getGlobalOrientation());
+#endif
+
+      } else if (pathType == 1) {
+        // walk while maintaining the same heading
+        // get the difference between the current heading and the desired direction (transform direction to the next point in base coordinate system)
+        float directionDiff = goalDirection - this->getGlobalOrientation();
+        if (directionDiff > PI) {
+          directionDiff -= 2 * PI;
+        } else if (directionDiff < -PI) {
+          directionDiff += 2 * PI;
+        }
+
+        uint8_t maxRadius = 30;
+        // take smaller steps if moving sideways
+        if (abs(directionDiff) > 0.08 && abs(directionDiff) < 3.06) {
+          maxRadius = 20;
+        }
+        uint8_t radius = min(distToGoal / 2, maxRadius);
+
+        // execute the step
+        this->step(legPos, directionDiff, radius, iterationNumber, 0.0);
+
+#ifdef DEBUG
+        Serial.println(radius);
+        Serial.print("Position (x, y): ");
+        Serial.print(this->getGlobalXPos());
+        Serial.print(", ");
+        Serial.println(this->getGlobalYPos());
+        Serial.print("Step Direction: ");
+        Serial.println(directionDiff);
+#endif
+      } else {
+        return false;
+      }
+
+      // recompute the distance to the goal position
+      distToGoal = (this->getGlobalXPos() - pathPoints[i][0]) * (this->getGlobalXPos() - pathPoints[i][0]) + (this->getGlobalYPos() - pathPoints[i][1]) * (this->getGlobalYPos() - pathPoints[i][1]);
+      distToGoal = sqrt(distToGoal);
+#ifdef DEBUG
+      Serial.print("New Distance to Goal: ");
+      Serial.println(distToGoal);
+      Serial.println("=============================");
+#endif
+    }
+#ifdef DEBUG
+    Serial.print("Sucessfully reached Point (x, y): ");
+    Serial.print(pathPoints[i][0]);
+    Serial.print(", ");
+    Serial.println(pathPoints[i][1]);
+#endif
+  }
+  return true;
+}
+
+
 void Hexapod::lineCircleIntersect(float mX, float mY, int radius, float pX, float pY, float direction, int intersections[2][2]) {
   /*
    * calculates the two intersections of the line specified by pX and pY and direction with the 
@@ -322,9 +469,9 @@ void Hexapod::lineCircleIntersect(float mX, float mY, int radius, float pX, floa
   float discriminant = b * b - 4 * a * c;
 
   if (discriminant < -1e-6) {
-    // if there are no coefficients, set intersections to -1
-    intersections[0][0] = intersections[0][1] = -1;
-    intersections[1][0] = intersections[1][1] = -1;
+    // if there are no coefficients, set intersections to -1000
+    intersections[0][0] = intersections[0][1] = -1000;
+    intersections[1][0] = intersections[1][1] = -1000;
     return;
   }
   // approximate the sqrt
@@ -343,7 +490,7 @@ void Hexapod::lineCircleIntersect(float mX, float mY, int radius, float pX, floa
     intersections[1][0] = shiftedPX + t2 * dx + mX;
     intersections[1][1] = shiftedPY + t2 * dy + mY;
   } else {
-    intersections[1][0] = intersections[1][1] = -1;
+    intersections[1][0] = intersections[1][1] = -1000;
   }
 }
 
@@ -473,4 +620,26 @@ float Hexapod::mapFloat(float x, float in_min, float in_max, float out_min, floa
 
 [[nodiscard]] float Hexapod::getGlobalYPos() {
   return globalYPosition;
+}
+
+void Hexapod::setStartPoint(float xGlobal, float yGlobal, float heading) {
+  /*
+   * Sets the starting point of the robot in the global coordinate system.
+   * 
+   * xGlobal:   x value in mm, set as starting point
+   * yGlobal:   y value in mm, set as starting point
+   * heading:   orientation (in rad) of the hexapod. 0.0 is default (x-axis pointing forward)
+   */
+  globalXPosition = xGlobal;
+  globalYPosition = yGlobal;
+  globalOrientation = heading;
+}
+
+void Hexapod::setHeading(float heading){
+  /*
+   * function to set the heading seperatly
+   * 
+   * heading:   orientation (in rad) of the hexapod. 0.0 is default (x-axis pointing forward)
+   */
+  globalOrientation = heading;
 }

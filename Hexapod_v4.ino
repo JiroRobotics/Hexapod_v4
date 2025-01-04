@@ -38,34 +38,32 @@ float currPositions[6][3];
 float newPositions[6][3];
 uint16_t counter = 0;
 
+const uint8_t numberPoints = 4;
+int16_t waypoints[numberPoints][2] = { { 500, 0 },
+                                       { 700, 300 },
+                                       { 400, 800 },
+                                       { 400, 1200 } };
+
 void setup() {
 
 #ifdef ARDUINO_ARDUINO_NANO33BLE
-  pinMode(LED_RED, OUTPUT);
-  pinMode(LED_BLUE, OUTPUT);
-  pinMode(LED_GREEN, OUTPUT);
+  pinMode(LEDR, OUTPUT);
+  pinMode(LEDB, OUTPUT);
+  pinMode(LEDG, OUTPUT);
 
   // Built in RGB is inverted
-  digitalWrite(LED_RED, HIGH);
-  digitalWrite(LED_BLUE, HIGH);
-  digitalWrite(LED_GREEN, HIGH);
+  digitalWrite(LEDR, HIGH);
+  digitalWrite(LEDB, HIGH);
+  digitalWrite(LEDG, HIGH);
 #endif
   // use the builtin LED on pin 13 as an OUTPUT
   pinMode(LED_BUILTIN, OUTPUT);
   digitalWrite(LED_BUILTIN, LOW);
-  // use all the push buttons on the legs as INPUT
-  pinMode(buttonFR, INPUT);
-  pinMode(buttonFL, INPUT);
-  pinMode(buttonMR, INPUT);
-  pinMode(buttonML, INPUT);
-  pinMode(buttonRR, INPUT);
-  pinMode(buttonRL, INPUT);
 
 #ifdef DEBUG
   // used for debug
   Serial.begin(9600);
 #endif
-  Serial.begin(9600);
 
   // start pwm on the servo drivers with 50Hz frequency
   pwm1.begin();
@@ -82,16 +80,13 @@ void setup() {
     while (1) {}
   }
   delay(1000);
-
-  // Configure WDT. Only uncomment this if it is your final version, since the watchdog prevents
-  // normal upload to the board. Otherwise it needs to be set to bootloader mode manually.
-  /*NRF_WDT->CONFIG = 0x01;    // Configure WDT to run when CPU is asleep
-  NRF_WDT->CRV = 65535;      // Timeout set to 2 seconds, timeout[s] = (CRV+1)/32768
-  NRF_WDT->RREN = 0x01;      // Enable the RR[0] reload register
-  NRF_WDT->TASKS_START = 1;  // Start WDT*/
 }
 
 void loop() {
+  myHexapod.travelPath(legPositions, waypoints, numberPoints, 120, 0);
+
+  while(true);
+  /*
   // get the current time
   unsigned long timeMillis = millis();
 
@@ -122,9 +117,9 @@ void loop() {
 
 #ifdef ARDUINO_ARDUINO_NANO33BLE
   if (loopCounter % 2) {  // turn the led on and of to show each loop iteration
-    digitalWrite(LED_GREEN, HIGH);
+    digitalWrite(LEDG, HIGH);
   } else {
-    digitalWrite(LED_GREEN, LOW);
+    digitalWrite(LEDG, LOW);
   }
 #else
   if (loopCounter % 2) {  // turn the led on and of to show each loop iteration
@@ -148,12 +143,7 @@ void loop() {
   while (millis() < timeMillis + periodMs) {
     // wait a bit so that the loop is executet every periodMS ms
   }
-#endif
-
-  // Reload the WDTs RR[0] reload register
-  // if this line isn't called at least every 2 seconds, the TIMEOUT event is called and the CPU is reset
-  // uncomment this if the watchdog is used
-  //NRF_WDT->RR[0] = WDT_RR_RR_Reload;
+#endif*/
 }
 
 
