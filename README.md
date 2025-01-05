@@ -20,9 +20,9 @@ Hexapods are six legged robots. They possess the ability to walk in any directio
 
 As written in the title, this project is my fourth hexapod robot. It uses largely the same hardware as the previous generation but the code was rewritten entirely. The ReadMe was written in order to provide support and document the whole project. Feel free to contact me for questions/suggestions/improvements.
 
-## Guidelines
+## Requirements
 
-In addition to the code in this repository, you will need two additional libraries, "Adafruit_PWMServoDriver.h" and "Arduino_BMI270_BMM150.h" for the servo driver and the IMU respectively. Just clone this repository and adjust the code to suit your robot. Almost all important constants are specified in Config.h, but a few other things also need to be changed, e.g. the constraints for leg movement (more on that later) or the servo pulse lengths. This ReadMe is written in a way which should allow you to follow my thought process during the creation of this robot. It is quite extensive so don't be afraid to skip some parts. The code is mathematically challenging, so you should be familiar with the basics of inverse kinematics and coordinate transformation in order to understand everything.
+In addition to the code in this repository, you will need two additional libraries, "Adafruit_PWMServoDriver.h" and "Arduino_BMI270_BMM150.h" for the servo driver and the IMU (only Arduino Nano 33 BLE) respectively. Just clone this repository and adjust the code to suit your robot. Almost all important constants are specified in Config.h, but a few other things also need to be changed, e.g. the constraints for leg movement (more on that later) or the servo pulse lengths. This ReadMe is written in a way which should allow you to follow my thought process during the creation of this robot. It is quite extensive so don't be afraid to skip some parts. The code is mathematically challenging, so you should be familiar with the basics of inverse kinematics and coordinate transformation in order to understand everything.
 
 ## Hardware
 
@@ -42,7 +42,7 @@ The code for this robot was entirely written in C++ (or rather the Arduino versi
 
 Let's take a look at the math-heavy challenges for this project:
 
-### Inverse kinematics of one leg
+### Inverse Kinematics Of One Leg
 **Goal:** given a point (x, y, z) in the local coordinate frame of the leg, calculate the joint angles of the three servo motors so that the end point of the leg reaches the desired point
 First, we assume that the point is valid/reachable (more on that later). Next we will have to take a look at the coordinate system and how the leg is positioned in it.
 
@@ -65,21 +65,21 @@ servoDriver.setPWM(pinCoxa, 0, angleFloat(coxaAngle + offsetCoxa));
 ```
 angleFloat() is a function to convert the angle in degrees to the corresponding pulse width of the PWM signal (also described in the Adafruit Servo Driver documentation). The values in angleFloat() have to be adjusted if another type of servo is used. offsetCoxa is the offset (in degrees) by which the (real) position of the leg differs compared to the ideal position. Find these values by assembling the robot, setting all servos to for example 90° and adjust the offsets until all joints are perfectly perpendicular.
 
-### Calculating valid points
+### Calculating Valid Points
 The leg can't reach every (x, y, z) point in 3D space. If we instruct the leg to move to an unreachable point, weird things can happen, potentionally even breaking the robot. Even if all points passed to the leg function _should_ be reachable, it is recommended to implement the following as a last safeguard:
 The constrains for the coxaAngle parameter can be chosen by simply measuring how far the legs can rotate before hitting the neighboring leg rotating in the opposite direction. In this case, coxaAngle can only be in the interval [40°, 130°]
 Instead of implementing constrains directly for tibiaAngle and femurAngle, we simply look at the L1 value and the z value and define an area in which L1 and z have to be to be valid. This area can be found mathematically or approximated using a CAD model (as shown in the image). By comparing L1 and z to the upper and lower bound, each point can be verified.
 
 <img src="pictures/HexapodLegReach.PNG" alt="Image of the area reachable by one leg" width="600">
 
-### The Hexapod class
+### The Hexapod Class
 As mentioned above, the six leg classes are passed to one Hexapod class which coordinates the legs and calculates all necessary points in the (local) coordinate system for each leg. The Hexapod class contains multiple methods for moving the robot:
 * **moveLegs():** This elementary method moves all six legs to their positions as specified in the array, if they are reachable.
 * **calcBodyMovement():** This method has six parameters (and two pointers to the leg position arrays). Namely three (x-, y-, z-) translation values and three (roll, pitch, yaw) rotation values. The robot center (the base coordinate system) is moved to match the given parameters, while all legs remain at their current position in the global coordinate frame. For example, a translation of xTrans = 30 means that the center of mass of the robot is shifted by 30mm to the front compared to home position, while an angle of roll = 0.2 (in radians) tilts the robot by approx. 11.5° sideways. Note that this method doesn't actually move the legs but rather calculates the positions of all legs and writes them in the <code>newPositions[][]</code> array. The moveLegs() method has to be called to actually move the legs.
 * **calcStep():** Universal method which lets the robot walk. It should be called periodically as many times as specified in stepNumber. In the first iteration, the final coordinates for each leg at the end of the step are calculated. In the following iterations, the current position is interpolated between the starting position and the final position. 
 * **Offroad mode:** Still needs to be implemented. Using the end switches, the robot will detect whether its legs touch the surface and adjust the z coordinate accordingly.
 
-### Calculating points for each leg
+### Calculating Points For Each Leg
 The position and orientation of the different coordinate frames can be seen in the picture below. The coordinate frame in the center of the robot is referred to as base coordinate system, which is identical to the global coordinate system at the start. The six local coordinate frames have their origin in the coxa joint of their leg respectively. 
 
 <img src="pictures/HexapodCoordinateFrames.png" alt="Image of the global and the six local coordinate systems" width="600">
@@ -139,7 +139,7 @@ The code above iterates over all legs. The bitmask allows only specific legs to 
 
 Improvements/additions would be to use quaternions for faster computation of the rotations or to just use 4x4 homogeneous matrices to first transform the coordinate frames and then calculate the translation and rotation in one step (and then transforming the frame back of course).
 
-### Walking in any direction
+### Walking In Any Direction
 Two approaches exist to create a walking motion in any direction (aka crab walk). Both approaches lift three legs, while the other three legs move the body. For example, the front left, middle right and rear left legs are being lifted, while the front right, middle left and rear right legs push the hexapod in the desired direction. The first version is simpler, but doesn't allow for long step distances, thus resulting in a more "unnatural" motion:
 > [!NOTE]  
 > The code for this approach can be found in the "deprecated" branch.
@@ -161,6 +161,19 @@ if ((overlayRotation > 0.02 && overlayRotation < 0.3) || (overlayRotation < -0.0
   calcBodyMovement(finalPositions, finalPositions, 0, 0, 0, 0.0, 0.0, overlayRotation, mask);
 }
 ```
+### Balancing
+If the Arduino you are using also has a built-in IMU, the robot can also balance itself. The current code only supports the IMU of the Arduino Nano 33 BLE Rev2 altough very few changes should be necessary to make it work using a Nano 33 IoT or similar. If you use your own sensor or layout, make sure that the calculation of roll and pitch angles in <code>readRollPitch()</code> and <code>calibrateIMU()</code> is correct (due to possibly different orientation of the IMU coordinate system).
+<br> When starting the robot, the IMU first needs to be calibrated. The offsets need to be adjusted to get a reference data in level position. This is done by taking 1000 samples, calculate the average and storing these values as offsets. After calibrating, the robot is able to calculate roll and pitch values at any moment in time. To get rid of noise in the data, a simple IIR low pass filter is used. Because of this, the  <code>readRollPitch()</code> or the <code>balance()</code> method should be called often, idealy with a fixed period. The control loop block diagram can be seen in the picture below.
 
-### Main loop
+<img src="pictures/HexapodBalanceController.png" alt="Block diagram of the balance controller" width="600">
+
+After calculating new roll and pitch output values, these values are passed to the <code>calcBodyMovement()</code> method, which calculates new leg positions wo compensate for the measured angles.
+> [!NOTE]  
+> Getting data from the IMU is quite slow (~5ms). Therefore, one iteration with <code>myHexapod.balance()</code> and <code>myHexapod.calcBodyMovement()</code> might take longer than 10ms (the default value for <code>periodMS</code>
+
+It is also possible to take steps while balancing, see <code>exampleBalanceAndStep()</code> for more details.
+
+### Path Following
+The <code>myHexapod.travelPath()</code> method allows the user to specify multiple target points in the global x-y-plane which the robot will try to reach one after another. Note that this method is blocking and therefore shouldn't be called together with other methods like <code>myHexapod.calcStep()</code> or <code>myHexapod.moveLegs()</code>. Two different modes for path following exist, one where the robot walks in any direction while maintaining the same heading (like a crab) and one where the robot only walks forward and rotates if necessary. The more points the hexapod travels to, the higher the inaccuracy in position and heading becomes. <code>rotateAccuracy</code> and <code>lengthAccuracy</code> are two parameters you can adjust to get better results.
+### Main Loop
 As already mentioned, the <code>loop()</code> function is called every 10ms (or as specified in Config.h). During each loop iteration, the legs are moved once using <code>myHexapod.moveLegs(newPositions)</code>. <code>newPositions[][]</code> can be can be calculated using either <code>myHexapod.calcStep()</code>, <code>myHexapod.calcBodyMovement()</code> or both. Example usage is provided in <code>exampleSteps()</code> and <code>exampleBodyMovement()</code>. The <code>myHexapod.getAction()</code> method can be used to check whether the robot is executing a step or resting at the moment. Additionally, a loopCounter is used to keep track of the number of times the loop has been executed. The green LED of the Arduino BLE is also toggled in every loop (yellow LED on other Arduinos).
