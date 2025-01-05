@@ -23,10 +23,9 @@ Leg legRearLeft = Leg(pwm1, coxaPinRL, femurPinRL, tibiaPinRL, coxaOffsetRL, fem
 
 // Initialization of hexapod object
 Hexapod myHexapod = Hexapod(legFrontRight, legFrontLeft, legMidRight, legMidLeft, legRearRight, legRearLeft);
-unsigned long loopCounter = 0;
 
-// array which stores the positions of each leg in x-y-z local coordinates
-// used to pass the calculated new positions to the .movelegs() methode
+// arrays which store the positions of each leg in x-y-z local coordinates
+// stores local leg positions after each completed step
 float legPositions[6][3] = { { homePos[0], homePos[1], homePos[2] },    // front right
                              { homePos[0], homePos[1], homePos[2] },    // front left
                              { homePos[0], homePos[1], homePos[2] },    // mid right
@@ -34,10 +33,17 @@ float legPositions[6][3] = { { homePos[0], homePos[1], homePos[2] },    // front
                              { homePos[0], homePos[1], homePos[2] },    // rear right
                              { homePos[0], homePos[1], homePos[2] } };  // rear left
 
+// preliminary leg positions before applying additional body movement
 float currPositions[6][3];
+// final leg positions for one iteration, passed to moveLegs()
 float newPositions[6][3];
-uint16_t counter = 0;
 
+// keeps track of steps taken
+uint16_t counter = 0;
+// keeps track of number of iterations
+unsigned long loopCounter = 0;
+
+// allows for basic path following
 const uint8_t numberPoints = 4;
 int16_t waypoints[numberPoints][2] = { { 500, 0 },
                                        { 700, 300 },
@@ -74,40 +80,31 @@ void setup() {
   // move all legs to their home position
   myHexapod.moveHome();
 
-  // start the IMU (currently unused)
-  if (!IMU.begin()) {
-    Serial.println("IMU-Sensor couldn't be initialized!");
-    while (1) {}
-  }
+  // start the internal IMU (Nano 33 BLE only)
+  myHexapod.startIMU();
+
+  myHexapod.calibrateIMU();
   delay(1000);
 }
 
 void loop() {
-  myHexapod.travelPath(legPositions, waypoints, numberPoints, 120, 0);
 
-  while(true);
-  /*
   // get the current time
   unsigned long timeMillis = millis();
 
   // exemplary movements of the robot
   // uncomment one of the following
   //exampleBodyMovement();
-  exampleSteps();
+  //exampleSteps();
   //exampleSteps2();
+  exampleBalanceAndStep(); // only Arduino Nano 33 BLE
+
+  // The path travel method is blocking and handles everything internally (moving legs etc.).
+  //myHexapod.travelPath(legPositions, waypoints, numberPoints, 120, 0, 0.2, 35);
+  //while(true){} // wait after reaching the last point
 
   // update the leg position
   myHexapod.moveLegs(newPositions);
-
-  if(myHexapod.getAction() == 0){
-    Serial.print("Position (x, y): ");
-    Serial.print(myHexapod.getGlobalXPos());
-    Serial.print(", ");
-    Serial.println(myHexapod.getGlobalYPos());
-    Serial.print("Heading: ");
-    Serial.println(myHexapod.getGlobalOrientation());
-    Serial.println("==========================");
-  }
 
   // increment the loopCounter to keep track of the number of loop cycles
   loopCounter++;
@@ -143,12 +140,20 @@ void loop() {
   while (millis() < timeMillis + periodMs) {
     // wait a bit so that the loop is executet every periodMS ms
   }
-#endif*/
+#endif
 }
 
 
+
+
+
 void exampleSteps() {
-  // example usage of the calcStep() method
+  /*
+   * Example usage of calcStep(). Does a couple of steps in different directions.
+   * counter keeps track of number of steps.
+   * 
+   * calcBodyMovement() would also allow for body movement while walking.
+   */
   // keep track of the number of steps
   if (myHexapod.getAction() == 0) {
     // increase the counter each time the robot is resting
@@ -173,8 +178,16 @@ void exampleSteps() {
   myHexapod.calcBodyMovement(currPositions, newPositions, 0, 0, 0, 0.0, 0.0, 0.0);
 }
 
+
+
+
 void exampleSteps2() {
-  // example usage of the calcStep() method
+  /*
+   * Example usage of calcStep()
+   * Walks in a straight line while rotating the robot simultaneously
+   *
+   * calcBodyMovement() would also allow for body movement during execution
+   */
   // keep track of the number of steps
   if (myHexapod.getAction() == 0) {
     // increase the counter each time the robot is resting
@@ -190,8 +203,31 @@ void exampleSteps2() {
   myHexapod.calcBodyMovement(currPositions, newPositions, 0, 0, 0, 0.0, 0.0, 0.0);
 }
 
+
+
+
+void exampleBalanceAndStep(){
+  /*
+   * Example usage of balance() in combination with calcStep().
+   * Slowly walks in a straight line while constantly adjusting roll and pitch of calcBodyMovement() to keep the body level.
+   *
+   * NOTE: only works on the Arduino Nano BLE Sense for now, Nano 33 IoT requires different library but is also possible
+   * NOTE: IMU is fairly slow (~5ms to get data). Therefore might take longer than the usual 10ms cycle.
+   */
+  myHexapod.calcStep(legPositions, currPositions, 0, 20, 150, 0.0, 20);
+  myHexapod.balance(currPositions, newPositions);
+}
+
+
+
+
 void exampleBodyMovement() {
-  // example usage of calcBodyMovement to move the robots body
+  /* 
+   * Example usage of calcBodyMovement to move the robots body.
+   * loopCounter keeps track of number of loop()-iterations.
+   *
+   * moves (translation and rotation) the robots body.
+   */
 
   if (loopCounter < 150) {
     int b = map(loopCounter, 0, 150, 0, 180);

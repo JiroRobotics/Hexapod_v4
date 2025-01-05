@@ -4,6 +4,8 @@
 
 #include "Leg.h"
 #include "Config.h"
+#include <Arduino_BMI270_BMM150.h>
+#include "SpeedTrig.h"
 
 class Hexapod {
 public:
@@ -43,6 +45,16 @@ public:
   // set the heading of the robot relative to the global coordinate system (the starting position)
   void setHeading(float heading = 0.0);
   
+  // starts the IMU of the Arduino board
+  bool startIMU();
+
+  // calibrates the IMU (calculates and saves offsets)
+  void calibrateIMU(uint16_t numSamples = 1000);
+
+  // reads the current roll and pitch angles (rad) to the passed parameters
+  bool readRollPitch(float &roll, float &pitch);
+
+  bool balance(float legPos[6][3], float newPos[6][3]);
 private:
   Leg &legFR;
   Leg &legFL;
@@ -73,6 +85,23 @@ private:
   // variables for accuracy of steps (e.g. whether a theoretical step length of 50mm will actually result in movement of 50mm in global coordinate frame or only 50mm*0.9)
   float rotateAccuracy = 0.9;
   float lengthAccuracy = 0.95;
+
+  // variables for calibrating IMU
+  // IMU pitch offset angle (rad)
+  float pitchOffset = 0.0;
+  // IMU roll offset angle (rad)
+  float rollOffset = 0.0;
+
+  // variables for IIR filter
+  // saves previous roll
+  float prevRoll = 0.0;
+  float prevPitch = 0.0;
+
+  //save previous roll pitch variables for control loop
+  // previous roll passed to calcBodyMovement in balance()
+  float prevRollOutput = 0.0;
+  // previous pitch passed to calcBodyMovement in balance()
+  float prevPitchOutput = 0.0;
 
   // array to save the end points of a crab walk step
   float finalPositions[6][3] = { { homePos[0], homePos[1], homePos[2] },    // front right

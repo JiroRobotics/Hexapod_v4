@@ -1,4 +1,3 @@
-#include "SpeedTrig.h"
 // Hexapod.cpp
 
 #include "Hexapod.h"
@@ -325,8 +324,9 @@ void Hexapod::step(float legPos[6][3], float stepDirection, uint8_t radius, uint
 bool Hexapod::travelPath(float legPos[6][3], int16_t pathPoints[][2], uint8_t numPoints, uint16_t iterationNumber, uint8_t pathType, float maxRotationPerStep, uint8_t stepHeight) {
   /*
    * Calculates and takes steps in order to reach the provided points one after another.
+   * NOTE: This function is blocking, it therefore doesn't work in the standard main loop!
    * 
-   * legPos[][]:      Array containing the leg position in the beginning of the step
+   * legPos[][]:      Array containing the leg positions before calling this method
    * pathPoints[][]:  Array containing the (x, y) points which the robot should travel to
    * numPoints:       number of points in the pathPoints array
    * iterationNumber: number of iterations per step. Fewer iterations result in faster movement
@@ -379,7 +379,7 @@ bool Hexapod::travelPath(float legPos[6][3], int16_t pathPoints[][2], uint8_t nu
         uint8_t radius = min(distToGoal / 2, maxRadius);
 
         // execute the step
-        this->step(legPos, 0.0, radius, iterationNumber, rotation);
+        this->step(legPos, 0.0, radius, iterationNumber, rotation, stepHeight);
 #ifdef DEBUG
         Serial.print("Position (x, y): ");
         Serial.print(this->getGlobalXPos());
@@ -407,7 +407,7 @@ bool Hexapod::travelPath(float legPos[6][3], int16_t pathPoints[][2], uint8_t nu
         uint8_t radius = min(distToGoal / 2, maxRadius);
 
         // execute the step
-        this->step(legPos, directionDiff, radius, iterationNumber, 0.0);
+        this->step(legPos, directionDiff, radius, iterationNumber, 0.0, stepHeight);
 
 #ifdef DEBUG
         Serial.println(radius);
@@ -579,6 +579,18 @@ void Hexapod::interpolateStep(float newPositions[6][3], float prevPositions[6][3
         newPositions[liftingLegs[i]][j] = mapFloat(stepCounter, startNumber * 1.0, targetNumber * 1.0, prevPositions[liftingLegs[i]][j], finalPositions[liftingLegs[i]][j]);
       }
     }
+  } else if (stepCounter < startNumber) {
+    for (int i = 0; i < 3; ++i) {
+      for (int j = 0; j < 2; ++j) {
+        newPositions[liftingLegs[i]][j] = prevPositions[liftingLegs[i]][j];
+      }
+    }
+  } else {
+    for (int i = 0; i < 3; ++i) {
+      for (int j = 0; j < 2; ++j) {
+        newPositions[liftingLegs[i]][j] = finalPositions[liftingLegs[i]][j];
+      }
+    }
   }
 
   // raise and lower the legs based on stepCounter. Only z coordinate is changed
@@ -635,11 +647,172 @@ void Hexapod::setStartPoint(float xGlobal, float yGlobal, float heading) {
   globalOrientation = heading;
 }
 
-void Hexapod::setHeading(float heading){
+void Hexapod::setHeading(float heading) {
   /*
    * function to set the heading seperatly
    * 
    * heading:   orientation (in rad) of the hexapod. 0.0 is default (x-axis pointing forward)
    */
   globalOrientation = heading;
+}
+
+bool Hexapod::startIMU() {
+  /*
+   * starts the IMU of the Arduino Nano 33 BLE (Sense). If sucessfull, the green LED will blink 3 times.
+   * If unsuccessful, the red LED will blink forever
+   *
+   * Returns: true if sucessful
+   */
+#ifdef ARDUINO_ARDUINO_NANO33BLE
+  if (!IMU.begin()) {
+#ifdef DEBUG
+    Serial.println("IMU-Sensor couldn't be initialized!");
+#endif
+    pinMode(LEDR, OUTPUT);
+    while (1) {
+      digitalWrite(LEDR, LOW);
+      delay(200);
+      digitalWrite(LEDR, HIGH);
+      delay(200);
+    }
+  } else {
+    pinMode(LEDG, OUTPUT);
+    for (uint8_t i = 0; i < 3; ++i) {
+      digitalWrite(LEDG, LOW);
+      delay(100);
+      digitalWrite(LEDG, HIGH);
+      delay(100);
+    }
+  }
+  return true;
+#else
+  return false;
+#endif
+}
+
+void Hexapod::calibrateIMU(uint16_t numSamples) {
+  /*
+   * Calibrates the IMU by calculating offsets for roll and pitch angles (rad)
+   * simple average is calculated and saved as offset
+   * The blue LED is on while calibrating
+   *
+   * numSamples:    number of samples over which the average is taken
+   */
+#ifdef ARDUINO_ARDUINO_NANO33BLE
+  uint16_t counter = 0;
+  float rollAvg = 0.0;
+  float pitchAvg = 0.0;
+  float x, y, z;
+
+  pinMode(LEDB, OUTPUT);
+  digitalWrite(LEDB, LOW);
+  while (counter < numSamples) {
+    if (IMU.accelerationAvailable()) {
+      IMU.readAcceleration(x, y, z);
+      rollAvg += atan2(y, x);
+      pitchAvg += atan2(z, sqrt(y * y + x * x));
+      counter++;
+    }
+  }
+  rollAvg = rollAvg / counter;
+  pitchAvg = pitchAvg / counter;
+
+  // safe the offsets in class variables
+  this->pitchOffset = pitchAvg;
+  this->rollOffset = rollAvg;
+
+#ifdef DEBUG
+  Serial.print("Roll Average (rad): ");
+  Serial.println(rollAvg);
+  Serial.print("Pitch Average (rad): ");
+  Serial.println(pitchAvg);
+#endif
+
+  digitalWrite(LEDB, HIGH);
+#endif
+}
+
+bool Hexapod::readRollPitch(float &roll, float &pitch) {
+/*
+   * calculates current roll and pitch, applies IIR filter and passes values to roll and pitch variables.
+   * Because of the IIR filter, it should be used frequently (ideally with fixed periodicity)
+   *
+   * roll:    parameter to which the filtered roll value is passed
+   * pitch:   parameter to which the filtered pitch value is passed
+   *
+   * Returns: true if sucessful, false otherwise
+   */
+// check availability
+#ifdef ARDUINO_ARDUINO_NANO33BLE
+  if (IMU.accelerationAvailable()) {
+    float x, y, z;
+    IMU.readAcceleration(x, y, z);
+    // calc current roll & pitch
+    float newRoll = atan2(y, x);
+    float newPitch = atan2(z, sqrt(y * y + x * x));
+
+    // IIR filter with coefficients 0.3, 0.7
+    roll = 0.2 * (newRoll - this->rollOffset) + 0.8 * this->prevRoll;
+    pitch = 0.2 * (newPitch - this->pitchOffset) + 0.8 * this->prevPitch;
+    this->prevRoll = roll;
+    this->prevPitch = pitch;
+
+    return true;
+  } else {
+    // return false if no data is available
+    return false;
+  }
+#else
+#warning "IMU only supported for Arduino Nano 33 BLE"
+  return false;
+#endif
+}
+
+bool Hexapod::balance(float legPos[6][3], float newPos[6][3]) {
+  float roll, pitch;
+  // proportional gain
+  float Kp = 0.12;
+  if (this->readRollPitch(roll, pitch)) {
+    //deadband for roll and pitch (approx. 2 deg)
+    if (abs(roll) < 0.035) {
+      roll = 0.0;
+    }
+    if (abs(pitch) < 0.035) {
+      pitch = 0.0;
+    }
+    // proportional controller adjusting the change in roll and pitch output
+    this->prevRollOutput += Kp * roll;
+    this->prevPitchOutput += Kp * pitch;
+
+    // limits for roll at +-0.25rad
+    if (this->prevRollOutput > 0.25) {
+      this->prevRollOutput = 0.25;
+    } else if (this->prevRollOutput < -0.25) {
+      this->prevRollOutput = -0.25;
+    }
+
+    // limits for pitch at +-0.25rad
+    if (this->prevPitchOutput > 0.25) {
+      this->prevPitchOutput = 0.25;
+    } else if (this->prevPitchOutput < -0.25) {
+      this->prevPitchOutput = -0.25;
+    }
+#ifdef DEBUG
+    Serial.print("RollOutput:");
+    Serial.print(this->prevRollOutput);
+    Serial.print("\tPitchOutput:");
+    Serial.println(this->prevPitchOutput);
+#endif
+    // update leg positions
+    this->calcBodyMovement(legPos, newPos, 0.0, 0.0, 0.0, this->prevRollOutput, this->prevPitchOutput, 0.0);
+    return true;
+  } else {
+    // important so that newPos is valid/initialized no matter what
+    for (uint8_t i = 0; i < 3; ++i) {
+      for (uint8_t j = 0; j < 6; ++j) {
+        legPos[j][i] = newPos[j][i];
+      }
+    }
+    return false;
+  }
 }

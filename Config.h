@@ -80,6 +80,7 @@ const uint8_t buttonRL = 11;
 // home position of every leg. x,y,z - values
 const float homePos[3] = { 0.0, 73.0, 80.0 };
 //const float homePos[3] = {0.0, 68.0, 88.0}; // use this if you want 90° angles when at home position
+//const float homePos[3] = { 0.0, 73.0, 95.0 }; // for a little more ground clearance
 
 // the loop is executed every [periodMs] milliseconds
 const uint16_t periodMs = 10;  // recommended for Arduino Nano 33 BLE Sense
