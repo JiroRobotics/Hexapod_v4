@@ -1,4 +1,5 @@
 # Hexapod v4
+Check out the YouTube video: https://youtu.be/cIIxmBn0WJ8
 
 <img src="pictures/hexapod_v4_picture_2.jpg" alt="Hexapod prototype" width="600">
 
