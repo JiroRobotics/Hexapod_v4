@@ -11,13 +11,21 @@ class Hexapod {
 public:
   // Constructor. Aggregation of the six legs of the hexapod
   Hexapod(Leg &legFR, Leg &legFL, Leg &legMR, Leg &legML, Leg &legRR, Leg &legRL)
-    : legFR(legFR), legFL(legFL), legMR(legMR), legML(legML), legRR(legRR), legRL(legRL) {}
+    : legFR(legFR), legFL(legFL), legMR(legMR), legML(legML), legRR(legRR), legRL(legRL) {
+    // initialize the array
+    legs[0] = &legFR;
+    legs[1] = &legFL;
+    legs[2] = &legMR;
+    legs[3] = &legML;
+    legs[4] = &legRR;
+    legs[5] = &legRL;
+  }
 
   // calculates the next position for each leg and passes them to newPositions[][] array
   void calcBodyMovement(float prevPositions[6][3], float newPositions[6][3], float xTrans, float yTrans, float zTrans, float roll, float pitch, float yaw, uint8_t legMask = 0b111111);
-  
+
   // calculates the leg end point coordinates and stores them in newPositions[][] for executing a step
-  bool calcStep(float prevPositions[6][3], float newPositions[6][3], float stepDirection, uint8_t radius, uint16_t stepNumber, float overlayRotation = 0.0, uint8_t stepHeight = 20);
+  bool calcStep(float prevPositions[6][3], float newPositions[6][3], float stepDirection, uint8_t radius, uint16_t stepNumber, float overlayRotation = 0.0, uint8_t stepHeight = 20, bool useOffroad = false);
 
   // method to instantly move all legs to the default (home) position. Returns true if successful
   bool moveHome();
@@ -44,7 +52,7 @@ public:
 
   // set the heading of the robot relative to the global coordinate system (the starting position)
   void setHeading(float heading = 0.0);
-  
+
   // starts the IMU of the Arduino board
   bool startIMU();
 
@@ -54,7 +62,11 @@ public:
   // reads the current roll and pitch angles (rad) to the passed parameters
   bool readRollPitch(float &roll, float &pitch);
 
+  // closed loop controller, which tries to keep the robot level (roll & pitch)
   bool balance(float legPos[6][3], float newPos[6][3]);
+
+  // adjusts the z coordinate of all legs to keep an average z coordinate (necessary for offroad mode)
+  void averageLegs(float legPos[6][3], float avgHeight, uint8_t legMask = 0b111111);
 private:
   Leg &legFR;
   Leg &legFL;
@@ -62,6 +74,9 @@ private:
   Leg &legML;
   Leg &legRR;
   Leg &legRL;
+
+  // Array for leg pointers
+  Leg *legs[6];
 
   // variable representing the current action of the hexapod.
   // 0 = sleeping / doing nothing
@@ -116,9 +131,11 @@ private:
 
   // used in calcStep
   int getOppositeIntersection(float pX, float pY, float direction, int intersections[2][2]);
-  
+
   // used in calcStep
   void interpolateStep(float newPositions[6][3], float prevPositions[6][3], float finalPositions[6][3], uint8_t stepHeight, uint16_t stepCounter, uint16_t stepNumber, bool moveRightLeg, bool moveAllLegs = true);
+
+  void interpolateOffroadStep(float newPositions[6][3], float prevPositions[6][3], float finalPositions[6][3], uint8_t stepHeight, uint16_t stepCounter, uint16_t stepNumber, bool moveRightLeg, bool moveAllLegs = true);
 
   // map() only works with integers, not floating point numbers
   float mapFloat(float x, float in_min, float in_max, float out_min, float out_max);

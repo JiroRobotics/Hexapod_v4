@@ -96,7 +96,7 @@ void Hexapod::calcBodyMovement(float prevPositions[6][3], float newPositions[6][
   }
 }
 
-bool Hexapod::calcStep(float prevPositions[6][3], float newPositions[6][3], float stepDirection, uint8_t radius, uint16_t stepNumber, float overlayRotation, uint8_t stepHeight) {
+bool Hexapod::calcStep(float prevPositions[6][3], float newPositions[6][3], float stepDirection, uint8_t radius, uint16_t stepNumber, float overlayRotation, uint8_t stepHeight, bool useOffroad) {
   /*
    * Calculates the position of the leg end point in local coordinates for all legs during a step.
    * One set of legs moves the robot, the other set moves to the best spot for the next step, assuming the next step is taken in the same
@@ -112,6 +112,7 @@ bool Hexapod::calcStep(float prevPositions[6][3], float newPositions[6][3], floa
    * stepNumber:        number of iterations for one whole step. periodMS * stepNumber = duration of one step
    * overlayRotation:   angle (in rad) by which the robot rotates around the z (yaw) axis during one step. Must be between 0.02 and 0.3 or -0.02 and -0.3
    * stepHeight:        distance (in mm) by which the legs are raised to return home. Default: 20mm
+   * useOffroad:        if true, uses each legs button to lower the legs until they touch the ground. Slower speed and larger stepHeight recommended
    *
    * returns:           false if the robot is executing a step, true if the step has just finished
    */
@@ -248,8 +249,13 @@ bool Hexapod::calcStep(float prevPositions[6][3], float newPositions[6][3], floa
 
   // actually move the legs to the mapped position
   if (stepCounter > 0 && stepCounter <= stepNumber) {
-    // interpolate the current leg position. Using the map() function will result in a linear motion to the final position
-    interpolateStep(newPositions, prevPositions, finalPositions, stepHeight, stepCounter, stepNumber, moveRightLeg);
+    if (!useOffroad) {
+      // interpolate the current leg position. Using the map() function will result in a linear motion to the final position
+      interpolateStep(newPositions, prevPositions, finalPositions, stepHeight, stepCounter, stepNumber, moveRightLeg);
+    } else {
+      // use buttons on each leg
+      interpolateOffroadStep(newPositions, prevPositions, finalPositions, stepHeight, stepCounter, stepNumber, moveRightLeg);
+    }
   }
 
   if (stepCounter == stepNumber) {
@@ -264,9 +270,18 @@ bool Hexapod::calcStep(float prevPositions[6][3], float newPositions[6][3], floa
     prevDirection = stepDirection;
 
     // copy the final positions (without translation and rotation) in the current position array
-    for (int i = 0; i < 6; ++i) {
-      for (int j = 0; j < 3; ++j) {
-        prevPositions[i][j] = finalPositions[i][j];
+    if (!useOffroad) {
+      for (int i = 0; i < 6; ++i) {
+        for (int j = 0; j < 3; ++j) {
+          prevPositions[i][j] = finalPositions[i][j];
+        }
+      }
+    } else {
+      // don't use finalPositions as end positions when using offroad mode because legs might not reach the desired positions (especially z coord)
+      for (int i = 0; i < 6; ++i) {
+        for (int j = 0; j < 3; ++j) {
+          prevPositions[i][j] = newPositions[i][j];
+        }
       }
     }
     // reset the step counter after one step is completed
@@ -614,6 +629,111 @@ void Hexapod::interpolateStep(float newPositions[6][3], float prevPositions[6][3
   }
 }
 
+void Hexapod::interpolateOffroadStep(float newPositions[6][3], float prevPositions[6][3], float finalPositions[6][3], uint8_t stepHeight, uint16_t stepCounter, uint16_t stepNumber, bool moveRightLeg, bool moveAllLegs) {
+  /*
+   * Generates the movement pattern for one step. Largely based on linear interpolation between prevPositions and finalPositions.
+   * Three legs are also lifted (specified by moveRightLeg) and moved faster than the stationary legs. This allows them to reach their position
+   * before they lower, thus making faster motion possible.
+   *
+   * newPositions[6][3]:      Array containing the new (calculated) positions for each leg in x-y-z local coordinates.
+   * prevPositions[6][3]:     Array containing the start position in the beginning of the whole step. Used as starting point for the interpolation
+   * finalPositions[6][3]:    Array containing the previously calculated final positions for each leg. The end point for interpolation
+   * stepHeight:              Height (mm) by which the legs are being lifted
+   * stepCounter:             The number of the current iteration of the step. Must be smaller than stepNumber
+   * stepNumber:              Number of iterations in one whole step
+   * moveRightLeg:            If true, legs FL, MR, RL are being lifted. Otherwise, legs FR, ML, RR
+   * moveAllLegs:             If true, all six legs are being moved in a strait line. Otherwise, only the legs which are lifted are moved. 
+   *                          Necessary if the legs touching the ground don't move in a strait line.
+   *
+   */
+  // make sure stepCounter and stepNumber are valid
+  if (stepCounter > stepNumber) {
+    stepCounter = stepNumber;
+  }
+
+  // legs FL, MR, RL are lifted by default
+  int liftingLegs[3] = { 1, 2, 5 };
+  // the other legs are stationary
+  int stationaryLegs[3] = { 0, 3, 4 };
+
+  // bitmask for leg averaging
+  uint8_t bitmask = 0b100110;
+
+  if (moveRightLeg == false) {
+    // lift legs FR, ML, RR
+    liftingLegs[0] = 0;
+    liftingLegs[1] = 3;
+    liftingLegs[2] = 4;
+
+    // the other legs are stationary
+    stationaryLegs[0] = 1;
+    stationaryLegs[1] = 2;
+    stationaryLegs[2] = 5;
+
+    bitmask = 0b011001;
+  }
+
+  // normal interpolation legs which aren't being lifted
+  // don't move these legs if moveAllLegs == false (if these legs don't follow a simple line, for example while rotating on the spot)
+  if (moveAllLegs == true) {
+    for (int i = 0; i < 3; ++i) {
+      for (int j = 0; j < 3; ++j) {
+        newPositions[stationaryLegs[i]][j] = mapFloat(stepCounter, 0.0, stepNumber * 1.0, prevPositions[stationaryLegs[i]][j], finalPositions[stationaryLegs[i]][j]);
+      }
+    }
+    // adjust body height of the three legs
+    averageLegs(newPositions, homePos[2], bitmask);
+  }
+  // the other legs are only moved in z direction (up and down) before being moved to their new position in the xy plane
+  // this results in smoother walking patterns
+  uint16_t startNumber = ceil(stepNumber * 0.2);     // number of iterations at which the legs start to move in the xy plane
+  uint16_t targetNumber = floor(stepNumber * 0.75);  // number of iterations at which the legs reach their final xy position
+  if (stepCounter >= startNumber && stepCounter <= targetNumber) {
+    // z coordinate is calculated seperatly
+    for (int i = 0; i < 3; ++i) {
+      for (int j = 0; j < 2; ++j) {
+        newPositions[liftingLegs[i]][j] = mapFloat(stepCounter, startNumber * 1.0, targetNumber * 1.0, prevPositions[liftingLegs[i]][j], finalPositions[liftingLegs[i]][j]);
+      }
+    }
+  } else if (stepCounter < startNumber) {
+    for (int i = 0; i < 3; ++i) {
+      for (int j = 0; j < 2; ++j) {
+        newPositions[liftingLegs[i]][j] = prevPositions[liftingLegs[i]][j];
+      }
+    }
+  } else {
+    for (int i = 0; i < 3; ++i) {
+      for (int j = 0; j < 2; ++j) {
+        newPositions[liftingLegs[i]][j] = finalPositions[liftingLegs[i]][j];
+      }
+    }
+  }
+
+  // raise and lower the legs based on stepCounter. Only z coordinate is changed
+  uint16_t upSteps = ceil(stepNumber * 0.15);     // legs are lifted in the first 15% of the step
+  uint16_t downSteps = floor(stepNumber * 0.80);  // legs are lowered in the last 20% of the step
+  if (stepCounter < upSteps) {
+    //lifts legs
+    for (int i = 0; i < 3; ++i) {
+      newPositions[liftingLegs[i]][2] = mapFloat(stepCounter, 0.0, upSteps * 1.0, prevPositions[liftingLegs[i]][2], finalPositions[liftingLegs[i]][2] - stepHeight);
+    }
+  } else if (stepCounter > downSteps) {
+    // lower legs
+    for (int i = 0; i < 3; ++i) {
+      // only lower the legs while they don't touch the ground
+      if (!legs[liftingLegs[i]]->touchesGround()) {
+        // lower the leg further down than usual (max = standard + stepHeight)
+        newPositions[liftingLegs[i]][2] = mapFloat(stepCounter, downSteps * 1.0, stepNumber * 1.0, prevPositions[liftingLegs[i]][2] - stepHeight, finalPositions[liftingLegs[i]][2] + stepHeight);
+      }
+    }
+  } else {
+    // keep the legs lifted
+    for (int i = 0; i < 3; ++i) {
+      newPositions[liftingLegs[i]][2] = prevPositions[liftingLegs[i]][2] - stepHeight;
+    }
+  }
+}
+
 float Hexapod::mapFloat(float x, float in_min, float in_max, float out_min, float out_max) {
   return (x - in_min) * (out_max - out_min) / (in_max - in_min) + out_min;
 }
@@ -814,5 +934,40 @@ bool Hexapod::balance(float legPos[6][3], float newPos[6][3]) {
       }
     }
     return false;
+  }
+}
+
+void Hexapod::averageLegs(float legPos[6][3], float avgHeight, uint8_t legMask) {
+  /*
+   * Calculates the current average over all z coordinate and adjusts all z values to get the desired average
+   *
+   * legPos[6][3]:  current leg positions, will be changed
+   * avgHeight:     the desired z value in mm
+   * legMask:       bitmask to select which legs to average and adjust
+   */
+  float currentAverage = 0.0;
+  uint8_t counter = 0;
+  // calculate the current average
+  for (uint8_t i = 0; i < 6; ++i) {
+    // check whether the leg should be taken into account
+    if (legMask & (1 << (5 - i))) {
+      currentAverage += legPos[i][2];
+      counter++;
+    }
+  }
+  currentAverage /= counter;
+  // adjust the z coordinate slowly, by 0.5 mm per function call
+  for (uint8_t i = 0; i < 6; ++i) {
+    // only adjust the specified legs
+    if (legMask & (1 << (5 - i))) {
+
+      if (currentAverage > avgHeight + 0.25) {
+        // lower the body if average is too high
+        legPos[i][2] -= 0.5;
+      } else if (currentAverage < avgHeight - 0.25) {
+        // raise the body if average is too low
+        legPos[i][2] += 0.5;
+      }
+    }
   }
 }

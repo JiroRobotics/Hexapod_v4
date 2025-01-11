@@ -97,7 +97,10 @@ void loop() {
   //exampleBodyMovement();
   //exampleSteps();
   //exampleSteps2();
-  exampleBalanceAndStep(); // only Arduino Nano 33 BLE
+  //exampleBalanceAndStep(); // only Arduino Nano 33 BLE
+  //exampleOffroad();
+  
+
 
   // The path travel method is blocking and handles everything internally (moving legs etc.).
   //myHexapod.travelPath(legPositions, waypoints, numberPoints, 120, 0, 0.2, 35);
@@ -218,7 +221,17 @@ void exampleBalanceAndStep(){
   myHexapod.balance(currPositions, newPositions);
 }
 
-
+void exampleOffroad(){
+  /*
+   * Uses the built in buttons in each leg to determine whether the leg touches the ground. This allows the robot to walk over uneven terrain
+   * Slowly walks in a straight line, while constantly adjusting roll and pitch to keep the body level.
+   *
+   * NOTE: only works on the Arduino Nano BLE Sense for now, Nano 33 IoT requires different library but is also possible
+   * NOTE: IMU is fairly slow (~5ms to get data). Therefore might take longer than the usual 10ms cycle.
+   */
+  myHexapod.calcStep(legPositions, currPositions, 0, 20, 150, 0.0, 30, true);
+  myHexapod.balance(currPositions, newPositions);
+}
 
 
 void exampleBodyMovement() {
