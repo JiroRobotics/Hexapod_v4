@@ -629,7 +629,7 @@ void Hexapod::interpolateStep(float newPositions[6][3], float prevPositions[6][3
   }
 }
 
-void Hexapod::interpolateOffroadStep(float newPositions[6][3], float prevPositions[6][3], float finalPositions[6][3], uint8_t stepHeight, uint16_t stepCounter, uint16_t stepNumber, bool moveRightLeg, bool moveAllLegs) {
+void Hexapod::interpolateOffroadStep(float newPositions[6][3], float prevPositions[6][3], float finalPositions[6][3], uint8_t stepHeight, uint16_t &stepCounter, uint16_t stepNumber, bool moveRightLeg, bool moveAllLegs) {
   /*
    * Generates the movement pattern for one step. Largely based on linear interpolation between prevPositions and finalPositions.
    * Three legs are also lifted (specified by moveRightLeg) and moved faster than the stationary legs. This allows them to reach their position
@@ -659,6 +659,10 @@ void Hexapod::interpolateOffroadStep(float newPositions[6][3], float prevPositio
   // bitmask for leg averaging
   uint8_t bitmask = 0b100110;
 
+  if (stepCounter < stepNumber * 0.7) {
+    this->anyLegTouchGround = false;
+  }
+
   if (moveRightLeg == false) {
     // lift legs FR, ML, RR
     liftingLegs[0] = 0;
@@ -675,7 +679,7 @@ void Hexapod::interpolateOffroadStep(float newPositions[6][3], float prevPositio
 
   // normal interpolation legs which aren't being lifted
   // don't move these legs if moveAllLegs == false (if these legs don't follow a simple line, for example while rotating on the spot)
-  if (moveAllLegs == true) {
+  if (moveAllLegs == true && this->anyLegTouchGround == false) {
     for (int i = 0; i < 3; ++i) {
       for (int j = 0; j < 3; ++j) {
         newPositions[stationaryLegs[i]][j] = mapFloat(stepCounter, 0.0, stepNumber * 1.0, prevPositions[stationaryLegs[i]][j], finalPositions[stationaryLegs[i]][j]);
@@ -711,7 +715,7 @@ void Hexapod::interpolateOffroadStep(float newPositions[6][3], float prevPositio
 
   // raise and lower the legs based on stepCounter. Only z coordinate is changed
   uint16_t upSteps = ceil(stepNumber * 0.15);     // legs are lifted in the first 15% of the step
-  uint16_t downSteps = floor(stepNumber * 0.80);  // legs are lowered in the last 20% of the step
+  uint16_t downSteps = floor(stepNumber * 0.70);  // legs are lowered in the last 30% of the step
   if (stepCounter < upSteps) {
     //lifts legs
     for (int i = 0; i < 3; ++i) {
@@ -724,12 +728,21 @@ void Hexapod::interpolateOffroadStep(float newPositions[6][3], float prevPositio
       if (!legs[liftingLegs[i]]->touchesGround()) {
         // lower the leg further down than usual (max = standard + stepHeight)
         newPositions[liftingLegs[i]][2] = mapFloat(stepCounter, downSteps * 1.0, stepNumber * 1.0, prevPositions[liftingLegs[i]][2] - stepHeight, finalPositions[liftingLegs[i]][2] + stepHeight);
+      } else {
+        this->anyLegTouchGround = true;
       }
     }
   } else {
     // keep the legs lifted
     for (int i = 0; i < 3; ++i) {
       newPositions[liftingLegs[i]][2] = prevPositions[liftingLegs[i]][2] - stepHeight;
+    }
+  }
+
+  // check whether all legs touch the ground and skip the rest of the step
+  if(stepCounter > stepNumber * 0.7){
+    if(legs[liftingLegs[0]]->touchesGround() && legs[liftingLegs[1]]->touchesGround() && legs[liftingLegs[2]]->touchesGround()){
+      stepCounter = stepNumber;
     }
   }
 }

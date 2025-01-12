@@ -98,7 +98,7 @@ void loop() {
   //exampleSteps();
   //exampleSteps2();
   //exampleBalanceAndStep(); // only Arduino Nano 33 BLE
-  //exampleOffroad();
+  exampleOffroad();
   
 
 
@@ -229,7 +229,7 @@ void exampleOffroad(){
    * NOTE: only works on the Arduino Nano BLE Sense for now, Nano 33 IoT requires different library but is also possible
    * NOTE: IMU is fairly slow (~5ms to get data). Therefore might take longer than the usual 10ms cycle.
    */
-  myHexapod.calcStep(legPositions, currPositions, 0, 20, 150, 0.0, 30, true);
+  myHexapod.calcStep(legPositions, currPositions, 0, 20, 70, 0.0, 30, true);
   myHexapod.balance(currPositions, newPositions);
 }
 

@@ -112,6 +112,9 @@ private:
   float prevRoll = 0.0;
   float prevPitch = 0.0;
 
+  // variable for offroad walking
+  bool anyLegTouchGround = false;
+
   //save previous roll pitch variables for control loop
   // previous roll passed to calcBodyMovement in balance()
   float prevRollOutput = 0.0;
@@ -135,7 +138,7 @@ private:
   // used in calcStep
   void interpolateStep(float newPositions[6][3], float prevPositions[6][3], float finalPositions[6][3], uint8_t stepHeight, uint16_t stepCounter, uint16_t stepNumber, bool moveRightLeg, bool moveAllLegs = true);
 
-  void interpolateOffroadStep(float newPositions[6][3], float prevPositions[6][3], float finalPositions[6][3], uint8_t stepHeight, uint16_t stepCounter, uint16_t stepNumber, bool moveRightLeg, bool moveAllLegs = true);
+  void interpolateOffroadStep(float newPositions[6][3], float prevPositions[6][3], float finalPositions[6][3], uint8_t stepHeight, uint16_t &stepCounter, uint16_t stepNumber, bool moveRightLeg, bool moveAllLegs = true);
 
   // map() only works with integers, not floating point numbers
   float mapFloat(float x, float in_min, float in_max, float out_min, float out_max);
